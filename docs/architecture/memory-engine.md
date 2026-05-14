@@ -44,3 +44,5 @@ Cyro memory is not chat history. It is compressed, structured, time-aware contex
 - User approves before user.md or memory.md updates.
 - Stale memories are downgraded, not blindly deleted.
 - Current facts override superseded facts.
+- Provider Account Bridge responses can create Ghost Tree memory proposals only.
+- Provider-derived memory proposals require explicit user approval before any Ghost Tree write.

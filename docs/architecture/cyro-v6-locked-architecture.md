@@ -50,9 +50,21 @@ Desktop is the heavy compiler later:
 - larger local models
 - Mobile Snapshot generation
 
+## Provider Account Bridge
+
+Future Provider Account Bridge exposes one chat-first Cyro workspace with route choices for Local, ChatGPT, Claude, Gemini, and future providers. It must feel like one Cyro-controlled conversation surface, not separate browser tabs.
+
+Under the hood, routing can target the local model runtime or a user-owned provider account session. Cyro's local layers remain the control plane: Ghost Tree memory, Vault, Prompt Privacy Filter, Runtime Governor, Context Capsule Builder, Import-to-Memory, and Cyro-owned sync of memory/config/history.
+
+Provider Account Bridge uses user-visible, user-authenticated provider sessions when implemented. It does not use provider APIs for this feature unless a future task explicitly authorizes an API mode. It does not store provider passwords, export or manipulate provider cookies, bypass CAPTCHA, bypass rate limits, bypass provider terms, scrape provider output, or perform hidden automation.
+
+External provider send requires local prompt privacy scanning. If sensitive data is detected, the user must choose redact, send as-is, or Local Only. Provider responses can produce Ghost Tree memory proposals, but user approval is required before memory writes.
+
+Provider session container and provider terms/security ADRs are required before implementation.
+
 ## Provider Boundary
 
-Future provider tabs are visible and user-controlled. Cyro never captures cookies, mirrors sessions, auto-sends, scrapes DOM, or uses consumer subscriptions as backend infrastructure.
+Future provider access is visible and user-controlled. Cyro never captures cookies, mirrors sessions, auto-sends, scrapes DOM, exports provider cookies, manipulates provider cookies, or uses consumer subscriptions as backend infrastructure.
 
 ## Sync Boundary
 
@@ -60,4 +72,4 @@ Sync uses append-only event logs and compact snapshots. No blind full database d
 
 ## MVP Boundary
 
-Build memory and context first. Defer provider tabs, VPN, AgentScope, cloud APIs, MCP production tools, and offline STT/TTS.
+Build memory and context first. Defer provider session containers, provider webviews, VPN, AgentScope, cloud APIs, MCP production tools, and offline STT/TTS. Sprint 0 remains the mocked desktop shell only.
