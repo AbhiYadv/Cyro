@@ -33,6 +33,10 @@ Agents must never:
 - scrape provider tabs
 - auto-send prompts
 - capture cookies/sessions
+- export or manipulate provider cookies
+- bypass CAPTCHA, rate limits, login protections, or provider terms
 - update memory silently
 - expose raw vault to cloud
 - execute destructive actions without approval
+
+Provider Account Bridge must use deterministic routing, privacy scan, import, and memory proposal services. Do not introduce AgentScope for provider account routing.
