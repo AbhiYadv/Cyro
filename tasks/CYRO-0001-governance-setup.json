@@ -1,0 +1,88 @@
+{
+  "task_id": "CYRO-0001",
+  "title": "Establish Cyro Engineering Governance, Architecture Setup, and Git Workflow",
+  "role": "Principal Software Engineer",
+  "priority": "P0",
+  "task_type": "governance_setup",
+  "objective": "Create foundational governance files, architecture docs, PRD, security checklist, AI rules, Git workflow rules, and review gates before product feature work begins.",
+  "strict_scope": {
+    "allowed": [
+      "Create AGENTS.md",
+      "Create architecture docs",
+      "Create PRD",
+      "Create rules docs",
+      "Create security checklist",
+      "Create agent/AI rules",
+      "Create Git workflow docs",
+      "Create review templates",
+      "Create tracker placeholder",
+      "Inspect repo and report structure"
+    ],
+    "blocked": [
+      "No product features",
+      "No provider webviews",
+      "No VPN",
+      "No AgentScope",
+      "No local model inference",
+      "No cloud APIs",
+      "No scraping/session/cookie logic",
+      "No unrelated refactors",
+      "No automatic push"
+    ]
+  },
+  "files_to_create_or_update": [
+    "AGENTS.md",
+    "docs/product/cyro-v6-prd.md",
+    "docs/architecture/cyro-v6-locked-architecture.md",
+    "docs/architecture/engineering-operating-model.md",
+    "docs/architecture/git-workflow-and-stages.md",
+    "docs/architecture/review-and-score-gates.md",
+    "docs/architecture/memory-engine.md",
+    "docs/architecture/context-capsule-builder.md",
+    "docs/architecture/mobile-snapshot.md",
+    "docs/architecture/desktop-memory-compiler.md",
+    "docs/architecture/provider-boundary.md",
+    "docs/architecture/sync-boundary.md",
+    "docs/architecture/runtime-resource-policy.md",
+    "docs/architecture/mvp-roadmap.md",
+    "docs/rules/product-boundaries.md",
+    "docs/rules/provider-safety.md",
+    "docs/rules/memory-safety.md",
+    "docs/rules/no-scraping-no-session-mirroring.md",
+    "docs/rules/dirty-workspace-prevention.md",
+    "docs/rules/agent-ai-rules.md",
+    "docs/security/security-checklist.md",
+    "docs/templates/codex-task-template.json",
+    "docs/templates/review-scorecard.md",
+    "docs/templates/task-completion-report.md",
+    "docs/tracker/cyro-task-tracker.md"
+  ],
+  "validation_commands": [
+    "git status --short",
+    "git branch --show-current",
+    "git log -1 --oneline",
+    "npm test || true",
+    "npm run typecheck || true",
+    "cargo check || true"
+  ],
+  "acceptance_criteria": [
+    "Setup docs exist",
+    "Architecture boundaries are explicit",
+    "No product features implemented",
+    "No provider automation added",
+    "dev/qa/uat/prod workflow documented",
+    "10/10 review gate documented",
+    "dirty workspace prevention documented",
+    "Codex report follows required format"
+  ],
+  "codex_report_format": [
+    "Scope completed",
+    "Current branch and workspace status",
+    "Files created/changed",
+    "Validation commands run",
+    "Architecture boundaries preserved",
+    "Risks or gaps",
+    "Recommended next task"
+  ],
+  "final_instruction": "Execute only this setup/governance task. Do not implement product features. Do not start the next task. Wait for review score."
+}

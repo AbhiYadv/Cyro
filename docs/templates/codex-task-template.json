@@ -1,0 +1,22 @@
+{
+  "task_id": "CYRO-0000",
+  "title": "Task title",
+  "role": "Principal Software Engineer",
+  "priority": "P0|P1|P2",
+  "task_type": "governance|architecture|frontend|backend|test|docs",
+  "objective": "",
+  "strict_scope": {
+    "allowed": [],
+    "blocked": []
+  },
+  "files_to_create_or_update": [],
+  "acceptance_criteria": [],
+  "validation_commands": [],
+  "codex_report_format": [
+    "Scope completed",
+    "Files changed",
+    "Tests run",
+    "Architecture boundary preserved",
+    "Risks / next step"
+  ]
+}
