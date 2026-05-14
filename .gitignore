@@ -6,6 +6,7 @@ dist-ssr/
 
 src-tauri/target/
 src-tauri/gen/
+target/
 
 *.log
 .DS_Store
