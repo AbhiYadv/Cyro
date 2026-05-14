@@ -30,3 +30,5 @@ A Context Capsule is the small, user-visible context block Cyro adds to a local 
 - Do not include rejected/pending memory.
 - Do not include stale facts if superseded by current facts.
 - Show preview before provider use unless user enabled auto-include safe context.
+- For Provider Account Bridge routes, run a local Prompt Privacy Filter before external provider send.
+- If sensitive data is detected, require the user to choose redact, send as-is, or Local Only.

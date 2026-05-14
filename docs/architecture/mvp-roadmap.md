@@ -50,6 +50,22 @@
 - VPN
 - AgentScope
 - real provider webviews
+- Provider Account Bridge implementation
+- isolated provider session containers
+- provider selector implementation
+- prompt privacy scanner implementation
 - cloud APIs
 - MCP production tools
 - offline STT/TTS
+
+## Backlog — Provider Account Bridge
+
+- Provider Account Bridge ADR
+- Isolated Provider Session Container Design
+- Unified Composer Provider Selector UX
+- Prompt Privacy Scanner
+- User-Approved Provider Response Import
+- Provider-Derived Ghost Tree Memory Proposal
+- Provider Session Health Panel
+
+All Provider Account Bridge implementation tasks are future/backlog work and do not change Sprint 0.
