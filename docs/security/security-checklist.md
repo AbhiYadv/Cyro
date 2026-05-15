@@ -84,6 +84,18 @@
 - [ ] Prompt content is not logged by default
 - [ ] No model files, sidecar binaries, downloads, cloud fallback, telemetry, or provider APIs are added by setup UI
 
+## Runtime Benchmark Gate
+- [ ] Benchmark execution is owned by Rust/Tauri only
+- [ ] React cannot execute binaries or pass arbitrary benchmark prompts
+- [ ] Benchmark prompt is fixed by trusted runtime code
+- [ ] Benchmark process uses structured `Command` args only
+- [ ] No shell command string, `shell=true`, command concatenation, or arbitrary sidecar args are used
+- [ ] Benchmark requires validated `llama-cli` sidecar path and validated local `.gguf` model path
+- [ ] Benchmark has a timeout and returns actionable blocked/failed states
+- [ ] Benchmark results remain local and in memory for CYRO-0009
+- [ ] No automatic startup benchmark, benchmark loop, telemetry upload, cloud fallback, provider call, model download, or model file commit is added
+- [ ] Prompt content is not logged by default and safe stderr/debug summaries remain bounded
+
 ## Model Path Validation
 - [ ] Rust/Tauri validates all model filesystem paths
 - [ ] Frontend does not validate filesystem paths directly

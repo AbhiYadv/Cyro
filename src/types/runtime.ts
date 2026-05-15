@@ -5,6 +5,30 @@ export type RuntimeMode = "fast" | "thinking";
 export type RuntimeRoute = "local_mock" | "local_sidecar";
 export type RuntimeState = "not_configured" | "sidecar_ready" | "model_valid" | "ready" | "generating" | "error";
 export type FinishReason = "completed" | "mock_fallback";
+export type BenchmarkStatus = "not_run" | "running" | "passed" | "slow" | "failed" | "blocked";
+export type LatencyClass = "fast" | "acceptable" | "slow" | "blocked" | "unknown";
+
+export type RuntimeBenchmarkResult = {
+  benchmarkId: string;
+  status: BenchmarkStatus;
+  modelId: string;
+  modelFileName: string | null;
+  modelFileSizeMb: number | null;
+  route: RuntimeRoute;
+  mode: RuntimeMode;
+  elapsedMs: number;
+  tokensPerSecondOptional: number | null;
+  latencyClass: LatencyClass;
+  passed: boolean;
+  reason: string;
+  createdAt: string;
+};
+
+export type RuntimeBenchmarkStatus = {
+  status: BenchmarkStatus;
+  latestResult: RuntimeBenchmarkResult | null;
+  message: string;
+};
 
 export type RuntimeStatus = {
   health: "ok";
@@ -17,6 +41,7 @@ export type RuntimeStatus = {
   sidecar: SidecarBinaryStatus;
   localModel: ModelRegistryEntry | null;
   modelRegistry: ModelRegistryEntry[];
+  benchmark: RuntimeBenchmarkStatus;
   lastError: RuntimeCommandError | null;
   network: "disabled";
   vault: "not_indexed";

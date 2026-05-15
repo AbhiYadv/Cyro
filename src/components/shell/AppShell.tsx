@@ -19,6 +19,11 @@ const defaultRuntimeStatus: RuntimeStatus = {
   sidecar: mockedSidecarStatus,
   localModel: placeholderModelRegistry[0],
   modelRegistry: placeholderModelRegistry,
+  benchmark: {
+    status: "not_run",
+    latestResult: null,
+    message: "Benchmark has not run. Configure local runtime paths before benchmarking."
+  },
   lastError: null,
   network: "disabled",
   vault: "not_indexed",

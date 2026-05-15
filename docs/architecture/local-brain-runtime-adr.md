@@ -385,7 +385,81 @@ Runtime error UX:
 - prompt content is not logged or shown in debug detail by default
 - React does not validate filesystem paths and does not execute binaries
 
-Streaming, cancellation controls, richer process lifecycle state, benchmark gates, durable config persistence, model picker UX, and final Local Brain UX remain future tasks.
+Streaming, cancellation controls, richer process lifecycle state, durable config persistence, model picker UX, and final Local Brain UX remain future tasks.
+
+## CYRO-0009 Runtime Benchmark Gate
+
+CYRO-0009 adds the first local-only benchmark gate for the validated `llama-cli` sidecar and `.gguf` model pair. It does not add streaming, `llama-server`, model downloads, bundled binaries, durable benchmark persistence, cloud fallback, or provider routing.
+
+Benchmark behavior:
+- user explicitly clicks `Run Benchmark`; no benchmark runs automatically on app startup
+- Rust owns benchmark execution through the same sidecar authority boundary as `send_local_prompt`
+- React never executes binaries, builds process arguments, or supplies arbitrary benchmark prompts
+- Rust uses a fixed benchmark prompt: `Answer with exactly three short bullets about what local inference means.`
+- benchmark process arguments are structured `Command` args, not shell strings
+- default benchmark max tokens is `80`
+- default benchmark timeout is `60000` ms
+- results remain local and in memory for this task
+- no telemetry upload or background benchmark loop exists
+
+Initial development latency classes:
+- `fast`: `elapsedMs <= 5000`
+- `acceptable`: `elapsedMs > 5000` and `elapsedMs <= 15000`
+- `slow`: `elapsedMs > 15000` and `elapsedMs <= 60000`
+- `blocked`: missing config, invalid sidecar/model, timeout, nonzero exit, unsafe state, or elapsed time above the local window
+
+The tiny local test model is useful for runtime proof and latency wiring only. It is not final answer-quality evidence.
+
+Runtime Governor relationship:
+- `get_runtime_status` exposes benchmark state when available
+- a ready `local_sidecar` route without a benchmark shows a warning
+- failed, slow, or blocked benchmark state is visible to the user
+- Fast/Think/Pro routing does not fully depend on benchmark results yet
+- future Runtime Governor tasks consume benchmark evidence for model and quantization selection
+
+### Runtime Benchmark Contracts
+
+`BenchmarkStatus` values:
+- `not_run`
+- `running`
+- `passed`
+- `slow`
+- `failed`
+- `blocked`
+
+`LatencyClass` values:
+- `fast`
+- `acceptable`
+- `slow`
+- `blocked`
+- `unknown`
+
+`RuntimeBenchmarkRequest` fields:
+- `modelId`
+- `mode`
+- `maxTokens`
+- `timeoutMs`
+
+`RuntimeBenchmarkResult` fields:
+- `benchmarkId`
+- `modelId`
+- `modelFileName`
+- `modelFileSizeMb`
+- `route`
+- `mode`
+- `elapsedMs`
+- `tokensPerSecondOptional`
+- `latencyClass`
+- `passed`
+- `reason`
+- `createdAt`
+
+`RuntimeBenchmarkError` fields:
+- `code`
+- `message`
+- `recoverable`
+- `userAction`
+- `debugDetailSafe`
 
 ## LocalModelConfig
 
@@ -460,14 +534,19 @@ Error handling rules:
 
 ## Benchmark Requirements
 
-Runtime benchmark is required before selecting benchmark-gated model/quantization pairs.
+Runtime benchmark is required before selecting benchmark-gated model/quantization pairs. CYRO-0009 provides the first in-memory local benchmark result; persistent Benchmark Store and full Runtime Governor consumption remain future work.
 
 Benchmark records must stay local and include:
 - model id
+- model file name and size where available
 - quantization
 - context window class
+- route
+- mode
+- elapsed milliseconds
 - cold start class
 - tokens per second class
+- latency class
 - memory pressure result
 - thermal result
 - battery impact class
@@ -516,4 +595,6 @@ Recommended sequence:
 3. First local inference command.
 4. Runtime status/error UX and manual path setup flow.
 5. Runtime benchmark gate.
-6. Streaming and cancellation contract.
+6. Local model candidate evaluation.
+7. Streaming and cancellation contract.
+8. Crisp answer protocol.

@@ -124,10 +124,25 @@ Runtime Governor must always make an explainable decision. The UI must be able t
 
 Benchmark Store persists device/model benchmark evidence. It must not be a full telemetry system.
 
+CYRO-0009 introduces the first benchmark evidence source before persistent Benchmark Store exists. The initial gate is local-only, user-triggered, in-memory, and tied to the currently validated `llama-cli` sidecar plus `.gguf` model path.
+
+Initial CYRO-0009 latency classes:
+- `fast`: `elapsedMs <= 5000`
+- `acceptable`: `elapsedMs > 5000` and `elapsedMs <= 15000`
+- `slow`: `elapsedMs > 15000` and `elapsedMs <= 60000`
+- `blocked`: timeout, missing config, invalid sidecar/model, nonzero exit, unsafe state, or elapsed time above the local window
+
+CYRO-0009 benchmark results are development gates only. Final thresholds may change after 0.8B, 1.5B, and 3B model evaluation.
+
 It records local benchmark results needed for safe runtime decisions:
 - benchmark id
 - device id
 - model id
+- model file name and size
+- route
+- requested mode
+- elapsed milliseconds
+- latency class
 - quantization
 - context window class
 - tokens per second class
@@ -139,6 +154,8 @@ It records local benchmark results needed for safe runtime decisions:
 - created timestamp
 
 Benchmarks are local-first. Cloud telemetry or background upload is out of scope.
+
+Runtime Governor must surface benchmark status when available, but CYRO-0009 does not make Fast, Think, or Pro fully dependent on benchmark results yet. Future CYRO-0010 and CYRO-0011 work can consume benchmark evidence for model candidate evaluation, streaming policy, and routing decisions.
 
 ## Laptop Node Discovery Contract
 
@@ -284,5 +301,6 @@ This document does not implement:
 - provider APIs
 - provider sessions
 - model downloads
-- benchmark execution
+- persistent benchmark store
+- full benchmark-driven route selection
 - laptop node transport

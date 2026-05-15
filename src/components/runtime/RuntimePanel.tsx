@@ -1,14 +1,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import { setModelPath, validateModelPath } from "../../services/modelRegistry";
 import {
+  benchmarkStatusLabel,
   composeActionableMessage,
+  formatBenchmarkElapsed,
+  formatBenchmarkTokens,
   formatModelFile,
+  isBenchmarkRunnable,
   isLocalRuntimeReady,
+  latencyClassLabel,
   routeLabel,
   runtimeStateLabel
 } from "../../services/runtimeStatus";
 import { setSidecarPath, validateSidecarPath } from "../../services/sidecar";
-import { formatRuntimeError } from "../../services/tauriClient";
+import { formatRuntimeError, runRuntimeBenchmark } from "../../services/tauriClient";
 import type { ModelPathValidationResult } from "../../types/modelRegistry";
 import type { RuntimeStatus } from "../../types/runtime";
 import type { SidecarBinaryStatus } from "../../types/sidecar";
@@ -40,11 +45,14 @@ export function RuntimePanel({ status, onStatusRefresh }: RuntimePanelProps) {
   const [modelValidation, setModelValidation] = useState<ModelPathValidationResult | null>(null);
   const [configStatus, setConfigStatus] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
-  const [activeAction, setActiveAction] = useState<"sidecar" | "model" | null>(null);
+  const [activeAction, setActiveAction] = useState<"sidecar" | "model" | "benchmark" | null>(null);
   const runtimeReady = isLocalRuntimeReady(status);
+  const benchmarkRunnable = isBenchmarkRunnable(status);
+  const latestBenchmark = status.benchmark.latestResult;
   const rows = [
     ["Runtime", runtimeStateLabel(status.runtimeState)],
     ["Route", routeLabel(status.activeRoute)],
+    ["Benchmark", benchmarkStatusLabel(status.benchmark.status)],
     ["Model", status.localModel?.validated ? status.localModel.displayName : "Not Configured"],
     ["Model File", formatModelFile(status.localModel)],
     ["Mode", formatMode(status.mode)],
@@ -127,6 +135,22 @@ export function RuntimePanel({ status, onStatusRefresh }: RuntimePanelProps) {
     }
   }
 
+  async function handleBenchmark() {
+    setActiveAction("benchmark");
+    setConfigStatus(null);
+    setConfigError(null);
+
+    try {
+      const result = await runRuntimeBenchmark(status.mode);
+      await onStatusRefresh();
+      setConfigStatus(`Benchmark ${benchmarkStatusLabel(result.status)}: ${latencyClassLabel(result.latencyClass)}`);
+    } catch (error) {
+      setConfigError(formatRuntimeError(error, "Runtime benchmark failed."));
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
   return (
     <aside className="runtime-panel" aria-label="Runtime panel">
       <div className="panel-header">
@@ -196,6 +220,41 @@ export function RuntimePanel({ status, onStatusRefresh }: RuntimePanelProps) {
             {configError}
           </span>
         ) : null}
+      </section>
+
+      <section className="runtime-config runtime-benchmark" aria-label="Runtime benchmark">
+        <div className="runtime-section-heading">
+          <p className="eyebrow">Benchmark Gate</p>
+          <span>Local only. Fixed prompt. No telemetry.</span>
+        </div>
+
+        <button className="benchmark-button" type="button" onClick={handleBenchmark} disabled={!benchmarkRunnable || activeAction !== null}>
+          {activeAction === "benchmark" || status.benchmark.status === "running" ? "Running Benchmark" : "Run Benchmark"}
+        </button>
+
+        <div className="benchmark-result">
+          <div className="runtime-row">
+            <span>Status</span>
+            <strong>{benchmarkStatusLabel(status.benchmark.status)}</strong>
+          </div>
+          <div className="runtime-row">
+            <span>Elapsed</span>
+            <strong>{formatBenchmarkElapsed(latestBenchmark)}</strong>
+          </div>
+          <div className="runtime-row">
+            <span>Latency</span>
+            <strong>{latestBenchmark ? latencyClassLabel(latestBenchmark.latencyClass) : "Not Run"}</strong>
+          </div>
+          <div className="runtime-row">
+            <span>Token Estimate</span>
+            <strong>{formatBenchmarkTokens(latestBenchmark)}</strong>
+          </div>
+          <div className="runtime-row">
+            <span>Model</span>
+            <strong>{latestBenchmark?.modelFileName ?? "No GGUF benchmarked"}</strong>
+          </div>
+          <span className={latestBenchmark?.passed ? "config-status" : "path-state"}>{latestBenchmark?.reason ?? status.benchmark.message}</span>
+        </div>
       </section>
 
       <div className="privacy-callout">

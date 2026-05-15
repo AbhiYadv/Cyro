@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+mod benchmark;
 mod llama_cli;
 mod model_registry;
 mod runtime_types;
@@ -29,6 +30,7 @@ struct RuntimeStatus {
     sidecar: sidecar::SidecarBinaryStatus,
     local_model: Option<model_registry::ModelRegistryEntry>,
     model_registry: Vec<model_registry::ModelRegistryEntry>,
+    benchmark: benchmark::RuntimeBenchmarkStatus,
     last_error: Option<RuntimeError>,
     network: &'static str,
     vault: &'static str,
@@ -46,6 +48,7 @@ fn health_check() -> HealthCheck {
 fn get_runtime_status(
     model_registry: tauri::State<'_, model_registry::ModelRegistryState>,
     sidecar_state: tauri::State<'_, sidecar::SidecarState>,
+    benchmark_state: tauri::State<'_, benchmark::BenchmarkState>,
 ) -> Result<RuntimeStatus, RuntimeError> {
     let sidecar = sidecar_state.current_status().map_err(|message| {
         RuntimeError::recoverable(
@@ -63,13 +66,15 @@ fn get_runtime_status(
             Some(message),
         )
     })?;
+    let benchmark = benchmark_state.current_status()?;
 
-    Ok(build_runtime_status(sidecar, registry))
+    Ok(build_runtime_status(sidecar, registry, benchmark))
 }
 
 fn build_runtime_status(
     sidecar: sidecar::SidecarBinaryStatus,
     model_registry: Vec<model_registry::ModelRegistryEntry>,
+    benchmark: benchmark::RuntimeBenchmarkStatus,
 ) -> RuntimeStatus {
     let local_model = model_registry
         .iter()
@@ -83,25 +88,48 @@ fn build_runtime_status(
         .unwrap_or(false);
 
     let (runtime_state, active_route, route_explanation) = match (sidecar_ready, model_ready) {
-        (true, true) => (
-            RuntimeState::Ready,
-            RuntimeRoute::LocalSidecar,
-            "Local GGUF sidecar route is ready. Prompts stay local and run through Rust-supervised llama-cli.",
-        ),
+        (true, true) => {
+            let benchmark_note = match benchmark.status {
+                benchmark::BenchmarkStatus::NotRun => {
+                    " Run the local benchmark before trusting larger model routing."
+                }
+                benchmark::BenchmarkStatus::Running => " Benchmark is currently running locally.",
+                benchmark::BenchmarkStatus::Passed => {
+                    " Latest benchmark passed the initial development gate."
+                }
+                benchmark::BenchmarkStatus::Slow => {
+                    " Latest benchmark completed but was slow for normal use."
+                }
+                benchmark::BenchmarkStatus::Failed => {
+                    " Latest benchmark failed; inspect the runtime error before normal use."
+                }
+                benchmark::BenchmarkStatus::Blocked => {
+                    " Latest benchmark was blocked; resolve the sidecar/model setup first."
+                }
+            };
+
+            (
+                RuntimeState::Ready,
+                RuntimeRoute::LocalSidecar,
+                format!(
+                    "Local GGUF sidecar route is ready. Prompts stay local and run through Rust-supervised llama-cli.{benchmark_note}"
+                ),
+            )
+        }
         (true, false) => (
             RuntimeState::SidecarReady,
             RuntimeRoute::LocalMock,
-            "llama-cli is validated. Configure a readable local GGUF model path to enable the sidecar route.",
+            "llama-cli is validated. Configure a readable local GGUF model path to enable the sidecar route.".to_string(),
         ),
         (false, true) => (
             RuntimeState::ModelValid,
             RuntimeRoute::LocalMock,
-            "A GGUF model path is validated. Configure an executable llama-cli sidecar path to enable the sidecar route.",
+            "A GGUF model path is validated. Configure an executable llama-cli sidecar path to enable the sidecar route.".to_string(),
         ),
         (false, false) => (
             RuntimeState::NotConfigured,
             RuntimeRoute::LocalMock,
-            "Local Brain is not configured. Cyro will use the local mock fallback.",
+            "Local Brain is not configured. Cyro will use the local mock fallback.".to_string(),
         ),
     };
 
@@ -122,6 +150,7 @@ fn build_runtime_status(
         sidecar,
         local_model,
         model_registry,
+        benchmark,
         last_error: None,
         network: "disabled",
         vault: "not_indexed",
@@ -267,10 +296,12 @@ pub fn run() {
             sidecar::get_sidecar_status,
             sidecar::set_sidecar_path,
             sidecar::validate_sidecar_path,
+            benchmark::run_runtime_benchmark,
             send_local_prompt
         ])
         .manage(model_registry::ModelRegistryState::default())
         .manage(sidecar::SidecarState::default())
+        .manage(benchmark::BenchmarkState::default())
         .run(tauri::generate_context!())
         .expect("failed to run Cyro Sprint 0 desktop shell");
 }
@@ -296,6 +327,7 @@ mod tests {
         let status = build_runtime_status(
             crate::sidecar::default_sidecar_status(),
             initial_model_registry(),
+            crate::benchmark::default_benchmark_status(),
         );
 
         assert_eq!(status.runtime_state, RuntimeState::NotConfigured);
@@ -313,11 +345,16 @@ mod tests {
         let mut registry = initial_model_registry();
         apply_model_path_to_registry(&mut registry, "qwen-0_8b-local", validation).unwrap();
 
-        let status = build_runtime_status(sidecar, registry);
+        let status = build_runtime_status(
+            sidecar,
+            registry,
+            crate::benchmark::default_benchmark_status(),
+        );
 
         assert_eq!(status.runtime_state, RuntimeState::Ready);
         assert_eq!(status.active_route, RuntimeRoute::LocalSidecar);
         assert_eq!(status.model_name.as_deref(), Some("Qwen 0.8B Local"));
+        assert!(status.route_explanation.contains("Run the local benchmark"));
     }
 
     #[test]
@@ -326,7 +363,11 @@ mod tests {
         let binary = sandbox.write_executable("llama-cli", "#!/bin/sh\nexit 0\n");
         let sidecar = validate_sidecar_path_value(path_str(&binary));
 
-        let status = build_runtime_status(sidecar, initial_model_registry());
+        let status = build_runtime_status(
+            sidecar,
+            initial_model_registry(),
+            crate::benchmark::default_benchmark_status(),
+        );
 
         assert_eq!(status.runtime_state, RuntimeState::SidecarReady);
         assert_eq!(status.active_route, RuntimeRoute::LocalMock);

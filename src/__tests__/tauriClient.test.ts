@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatRuntimeError, getRuntimeStatus, isPromptValid, sendLocalPrompt, type TauriInvoker } from "../services/tauriClient";
+import {
+  formatRuntimeError,
+  getRuntimeStatus,
+  isPromptValid,
+  runRuntimeBenchmark,
+  sendLocalPrompt,
+  type TauriInvoker
+} from "../services/tauriClient";
 
 describe("tauriClient Sprint 0 contract", () => {
   it("rejects empty prompts before invoking Tauri", async () => {
@@ -20,6 +27,9 @@ describe("tauriClient Sprint 0 contract", () => {
       modelName: null,
       runtimeState: "not_configured",
       activeRoute: "local_mock",
+      benchmark: {
+        status: "not_run"
+      },
       network: "disabled",
       vault: "not_indexed",
       memory: "local_only",
@@ -48,6 +58,41 @@ describe("tauriClient Sprint 0 contract", () => {
       route: "local_sidecar",
       modelId: "qwen-0_8b-local",
       mocked: false
+    });
+  });
+
+  it("invokes the native local benchmark command with fixed development gate arguments", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("run_runtime_benchmark");
+      expect(args).toEqual({
+        modelId: "qwen-0_8b-local",
+        mode: "fast",
+        maxTokens: 80,
+        timeoutMs: 60_000
+      });
+      return {
+        benchmarkId: "benchmark:1:qwen-0_8b-local",
+        status: "passed",
+        modelId: "qwen-0_8b-local",
+        modelFileName: "qwen-test.gguf",
+        modelFileSizeMb: 512,
+        route: "local_sidecar",
+        mode: "fast",
+        elapsedMs: 11_000,
+        tokensPerSecondOptional: 4.2,
+        latencyClass: "acceptable",
+        passed: true,
+        reason: "Benchmark passed.",
+        createdAt: "unix:1"
+      } as T;
+    };
+
+    const result = await runRuntimeBenchmark("fast", invoker);
+
+    expect(result).toMatchObject({
+      route: "local_sidecar",
+      latencyClass: "acceptable",
+      elapsedMs: 11_000
     });
   });
 
