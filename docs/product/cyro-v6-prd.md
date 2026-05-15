@@ -31,6 +31,7 @@ MVP focuses on:
 5. Import-to-Memory
 6. Structured Memory Contracts
 7. Resource-safe Local Quick Draft placeholder
+8. Runtime Intelligence Layer contracts for local brain routing
 
 MVP does not include:
 - VPN/Secure Route
@@ -39,7 +40,19 @@ MVP does not include:
 - AgentScope
 - cloud APIs
 - real local model runtime
+- laptop offload implementation
+- same-Wi-Fi discovery
 - real offline STT/TTS
+
+## Runtime Intelligence Layer
+
+The Runtime Intelligence Layer prepares the Local Brain phase. It decides model, quantization, route, and future offload policy from device resources, benchmark evidence, installed models, user settings, battery, thermal state, and trusted future laptop/node availability.
+
+Fast, Think, and Pro are routing modes, not hardcoded model names. Local 0.8B remains the always-available fallback. Cyro must not assume every device can run 3B or larger models.
+
+Runtime decisions must be explainable to the user. The product must be able to show why Cyro selected Local 0.8B, downgraded quantization, blocked a larger model, deferred work, or required approval for future offload.
+
+Laptop offload is a future trusted route. It requires explicit trusted device pairing, visible route explanation, and user approval when prompt privacy impact changes. Same-Wi-Fi discovery and offload transport are not part of this phase.
 
 ## Provider Account Bridge
 

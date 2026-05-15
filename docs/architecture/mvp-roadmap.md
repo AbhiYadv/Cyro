@@ -17,6 +17,12 @@
 - Memory Inspector
 - Import-to-Memory Sheet
 - Mobile Snapshot Status
+- Runtime Intelligence Layer contracts
+- Hardware Profiler contract
+- Model Registry contract
+- Quantization Policy matrix
+- Runtime Governor route decision contract
+- Benchmark Store gates
 
 ## Phase 2 — Shared Memory Core
 
@@ -57,6 +63,8 @@
 - cloud APIs
 - MCP production tools
 - offline STT/TTS
+- mDNS/same-Wi-Fi discovery
+- trusted laptop offload transport
 
 ## Backlog — Provider Account Bridge
 
@@ -69,3 +77,15 @@
 - Provider Session Health Panel
 
 All Provider Account Bridge implementation tasks are future/backlog work and do not change Sprint 0.
+
+## Backlog — Runtime Intelligence
+
+- Hardware Profiler Contract
+- Model Registry Contract
+- Quantization Policy Matrix
+- Runtime Governor Route Decision Contract
+- Benchmark Store and Device Capability Gates
+- Same-Wi-Fi Laptop Node Discovery ADR
+- Trusted Offload Routing Policy
+
+Runtime Intelligence implementation must stay resource-aware and user-visible. Laptop offload remains future work until trusted pairing and explicit approval are designed.
