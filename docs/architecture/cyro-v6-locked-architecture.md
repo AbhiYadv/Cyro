@@ -50,6 +50,16 @@ Desktop is the heavy compiler later:
 - larger local models
 - Mobile Snapshot generation
 
+## Runtime Intelligence Layer
+
+Cyro uses a Runtime Intelligence Layer to decide model, quantization, route, and future offload policy. Fast, Think, and Pro are routing modes, not hardcoded model names.
+
+Runtime decisions must consider device hardware profile, installed model registry entries, benchmark evidence, battery, thermal state, user settings, and trusted future laptop/node availability. Cyro must not assume every device can run 3B or larger models.
+
+Local 0.8B remains the always-available fallback. Larger local models and laptop offload require capability gates, benchmark gates, route explanation, and user consent where privacy impact changes.
+
+Same-Wi-Fi discovery and laptop offload are future architecture work. No silent offload of prompts is allowed.
+
 ## Provider Account Bridge
 
 Future Provider Account Bridge exposes one chat-first Cyro workspace with route choices for Local, ChatGPT, Claude, Gemini, and future providers. It must feel like one Cyro-controlled conversation surface, not separate browser tabs.
@@ -72,4 +82,4 @@ Sync uses append-only event logs and compact snapshots. No blind full database d
 
 ## MVP Boundary
 
-Build memory and context first. Defer provider session containers, provider webviews, VPN, AgentScope, cloud APIs, MCP production tools, and offline STT/TTS. Sprint 0 remains the mocked desktop shell only.
+Build memory, context, and runtime contracts first. Defer provider session containers, provider webviews, VPN, AgentScope, cloud APIs, MCP production tools, real local model inference, mDNS discovery, laptop offload, and offline STT/TTS. Sprint 0 remains the mocked desktop shell only.

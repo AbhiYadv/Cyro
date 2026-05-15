@@ -44,6 +44,13 @@
 - [ ] Phone does not keep multiple models hot
 - [ ] Heavy compile deferred to desktop
 - [ ] Fast path does not require VPN/provider/desktop
+- [ ] Runtime route decision uses hardware profile, model registry, benchmark gates, battery, and thermal state
+- [ ] 3B or larger models are blocked unless resource and benchmark gates pass
+- [ ] Quantization choice is benchmark-gated when required
+- [ ] Local 0.8B fallback remains available
+- [ ] Laptop/node offload requires trusted pairing and explicit user approval
+- [ ] No prompt is silently offloaded
+- [ ] User can see why a runtime route was selected
 
 ## Git/Release
 - [ ] Task branch from dev
