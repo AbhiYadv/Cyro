@@ -20,10 +20,12 @@
 | CYRO-PROVIDER-005 | User-Approved Provider Response Import | Backlog | Planned |  |  | Provider responses enter Cyro history/memory only by explicit user approval |
 | CYRO-PROVIDER-006 | Provider-Derived Ghost Tree Memory Proposal | Backlog | Planned |  |  | Cyro proposes structured memory facts from provider responses for user approval |
 | CYRO-PROVIDER-007 | Provider Session Health Panel | Backlog | Planned |  |  | Shows logged-in/available/blocked/error state per provider |
-| CYRO-PROVIDER-008 | Embedded Provider Session Feasibility Spike | Backlog | Planned |  |  | Proves whether Tauri can host visible provider sessions without exposing cookies, DOM, or response content |
-| CYRO-PROVIDER-009 | Provider Terms and Compliance Review | Backlog | Planned |  |  | Reviews ChatGPT/Claude/Gemini embedded-session constraints and defines allowed fallback behavior |
-| CYRO-PROVIDER-010 | Provider Session Container Isolation Tests | Backlog | Planned |  |  | Verifies provider id allowlist, arbitrary URL rejection, no cookie exposure, no DOM scraping, and visible blocker handling |
-| CYRO-PROVIDER-011 | Chat-First Embedded Provider Surface Prototype | Backlog | Planned |  |  | Tests an embedded provider surface while keeping provider selection in the composer and avoiding right-panel provider cards |
+| CYRO-PROVIDER-008 | Embedded Provider Session Feasibility | Backlog | Planned |  |  | Proves whether Tauri can host visible provider sessions inside Cyro without exposing cookies, DOM, or response content |
+| CYRO-PROVIDER-009 | In-Cyro Provider Surface Prototype | Backlog | Planned |  |  | Prototypes ChatGPT/Claude/Gemini opening inside Cyro's chat-first UX, not separate browser windows |
+| CYRO-PROVIDER-010 | Provider Import Button | Backlog | Planned |  |  | Adds explicit user action to import visible provider answers into Cyro history or memory-candidate flow |
+| CYRO-PROVIDER-011 | Always Import Visible Provider Answers Policy | Backlog | Planned |  |  | Defines that provider answers enter Cyro only through visible, user-triggered import; no hidden response capture |
+| CYRO-PROVIDER-012 | Provider Terms and Compliance Review | Backlog | Planned |  |  | Reviews ChatGPT/Claude/Gemini embedded-session constraints and defines temporary external-browser fallback behavior |
+| CYRO-PROVIDER-013 | Provider Session Container Isolation Tests | Backlog | Planned |  |  | Verifies provider id allowlist, arbitrary URL rejection, no cookie exposure, no DOM scraping, and visible blocker handling |
 | CYRO-RUNTIME-001 | Hardware Profiler Contract | Phase 1 | Planned |  |  | Defines device capability snapshot before model selection |
 | CYRO-RUNTIME-002 | Model Registry Contract | Phase 1 | Planned |  |  | Tracks installed models, quantization, RAM gates, and benchmark requirement |
 | CYRO-RUNTIME-003 | Quantization Policy Matrix | Phase 1 | Planned |  |  | Gates Q4/Q3/2-bit/larger model choices by resources and benchmark evidence |
@@ -55,3 +57,13 @@ Memory direction:
 - Context Capsule Builder is tracked before full Ghost Tree implementation.
 - Memory implementation remains after Local Brain runtime proof.
 - AgentScope is deferred until Cyro Agent Harness boundaries are defined.
+
+## Provider Account Bridge Final UX Target
+
+Final Provider Account Bridge UX target: ChatGPT, Claude, Gemini, and future providers open inside Cyro's chat-first UX, not as separate browser windows.
+
+External browser fallback is temporary and only used when embedded provider session is unavailable, blocked, or not yet implemented.
+
+Cyro remains the control plane for memory, vault, privacy filtering, provider route selection, and context capsule preparation.
+
+Provider-owned content must remain visible and user-controlled inside an isolated Cyro provider surface.

@@ -8,14 +8,16 @@ Proposed for architecture review.
 
 Cyro will keep provider routing inside the main chat composer. The production Provider Account Bridge must feel like one Cyro chat workspace with selectable routes, not a browser tab manager or a right-side provider card panel.
 
+Final Provider Account Bridge UX target: ChatGPT, Claude, Gemini, and future providers open inside Cyro's chat-first UX, not as separate browser windows.
+
 Current implementation state:
 - Local route sends to the Cyro local or mocked runtime.
-- ChatGPT, Claude, and Gemini routes use a safe external-browser fallback only.
+- ChatGPT, Claude, and Gemini routes may use a safe external-browser fallback only as temporary spike behavior or blocked-provider fallback.
 - Cyro does not send prompts automatically to providers.
 - Cyro shows external-provider handoff status only.
 
 Future production target:
-- A provider login/session may appear inside a Cyro-controlled provider surface after a separate implementation task proves isolation, terms compliance, and security controls.
+- A provider login/session must appear inside a Cyro-controlled provider surface after a separate implementation task proves isolation, terms compliance, and security controls.
 - The user manually logs in to the provider.
 - The user manually sends the provider prompt unless a future ADR explicitly approves a safer assisted flow.
 - Provider responses enter Cyro only by explicit user import.
@@ -23,9 +25,21 @@ Future production target:
 
 This ADR does not authorize provider API integrations, browser automation, scraping, provider-response capture, cookie handling, credential storage, or memory-import implementation.
 
+## Final UX Target
+
+The final product target is embedded in-Cyro provider sessions. The user should be able to choose ChatGPT, Claude, Gemini, or future providers from the Cyro composer and continue inside the Cyro workspace without leaving to a separate browser window.
+
+External browser fallback is temporary and only used when embedded provider session is unavailable, blocked, or not yet implemented.
+
+Embedded provider session feasibility is a required product milestone before Provider Account Bridge can be considered product-complete. The milestone must prove that provider-owned content can remain visible and user-controlled inside an isolated Cyro provider surface without exposing cookies, credentials, DOM, or response content to Cyro code.
+
+Cyro remains the control plane for memory, vault, privacy filtering, provider route selection, and context capsule preparation.
+
+Provider-owned content must remain visible and user-controlled inside an isolated Cyro provider surface.
+
 ## Context
 
-The CYRO-SPIKE-0004 result proved that an external browser fallback can safely open user-owned ChatGPT, Claude, and Gemini sessions. That fallback is safe but not the final UX. The desired product direction is a Gemini-like Cyro composer where Local, ChatGPT, Claude, Gemini, and future providers are routes inside one Cyro-owned chat surface.
+The CYRO-SPIKE-0004 result proved that an external browser fallback can safely open user-owned ChatGPT, Claude, and Gemini sessions. That fallback is safe, temporary, and explicitly not the final product UX. The desired product direction is a Gemini-like Cyro composer where Local, ChatGPT, Claude, Gemini, and future providers are routes inside one Cyro-owned chat surface.
 
 The product risk is that provider access can drift into forbidden behavior: browser automation, session mirroring, cookie export, DOM scraping, prompt injection, provider API wrapping, or hidden background provider use. The architecture must keep user agency and provider boundaries explicit.
 
@@ -41,7 +55,8 @@ The composer layout is locked for Provider Account Bridge work:
 
 Behavior contract:
 - Local sends through Cyro's local runtime path.
-- ChatGPT, Claude, and Gemini currently open safe external-browser fallback only.
+- ChatGPT, Claude, and Gemini must ultimately open inside Cyro's chat-first UX through visible isolated provider sessions.
+- External browser fallback is allowed only while embedded sessions are unavailable, blocked, or not yet implemented.
 - Provider routes must not auto-send the prompt.
 - Provider routes must show a visible handoff or blocked/error state.
 - Provider interactions must remain user-visible.
@@ -137,7 +152,7 @@ Provider Account Bridge must never include:
 ## Failure Behavior
 
 If embedded provider sessions are blocked, unsupported, or legally unsafe:
-- Cyro must fall back to explicit external-browser handoff.
+- Cyro may fall back to explicit external-browser handoff.
 - The UI must show a visible blocked/error state.
 - No retry loop may become hidden automation.
 - No attempt may bypass provider protections.

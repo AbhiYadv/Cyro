@@ -12,6 +12,10 @@ CYRO-SPIKE-0004 uses external-browser fallback for ChatGPT, Claude, and Gemini. 
 
 No embedded provider session is implemented.
 
+External browser fallback is temporary and only used when embedded provider session is unavailable, blocked, or not yet implemented.
+
+Final Provider Account Bridge UX target: ChatGPT, Claude, Gemini, and future providers open inside Cyro's chat-first UX, not as separate browser windows.
+
 ## Future Container Requirements
 
 A production provider session container must be:
@@ -23,6 +27,7 @@ A production provider session container must be:
 - unable to expose provider cookies, tokens, DOM, or response text to React
 - unable to run hidden provider activity
 - clear about provider-owned content versus Cyro-owned UI
+- embedded inside Cyro's chat-first workspace rather than opened as a separate browser window
 
 Provider origins:
 - ChatGPT: `https://chatgpt.com`
@@ -80,6 +85,12 @@ The primary Cyro UI remains the chat composer:
 - provider selector defaulted to Local
 - reasoning selector Fast/Think/Pro
 - send button
+
+Provider Account Bridge final UX requires the provider surface to appear inside Cyro's chat workspace after the user chooses a provider route. The provider surface must feel integrated into Cyro's chat-first UX while staying clearly labeled as provider-owned content.
+
+Cyro remains the control plane for memory, vault, privacy filtering, provider route selection, and context capsule preparation.
+
+Provider-owned content must remain visible and user-controlled inside an isolated Cyro provider surface.
 
 The embedded provider surface, if approved later, must support the chat-first model:
 - it must not replace the main Cyro composer with provider tabs
