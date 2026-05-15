@@ -10,3 +10,13 @@ target/
 
 *.log
 .DS_Store
+
+# Local model and sidecar artifacts
+*.gguf
+models/
+local-models/
+sidecars/
+sidecar-bin/
+tools/llama.cpp/
+src-tauri/binaries/llama-cli*
+src-tauri/binaries/llama-server*

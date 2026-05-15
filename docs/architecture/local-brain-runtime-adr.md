@@ -82,6 +82,95 @@ The sidecar must:
 - support cancellation or process termination before streaming work begins
 - avoid prompt content in logs by default
 
+## Sidecar Binary Discovery Strategy
+
+CYRO-0005 defines discovery strategy and a mocked sidecar status contract only. It does not execute the binary, run inference, load models, or validate model paths.
+
+Binary sources:
+- `development_override_path`: user or developer configured local path.
+- `standard_dev_path`: local development checkout such as `tools/llama.cpp/build/bin/llama-cli`; this path is not committed.
+- `future_bundled_sidecar_path`: packaged app resource path after an explicit packaging task.
+- `not_supported_yet`: automatic download.
+
+No auto-download is allowed in CYRO-0005.
+
+Binary names to consider:
+- `llama-cli`
+- `llama-server`
+
+First phase preference:
+- `llama-cli` is the first target for one-shot local prompt proof.
+- `llama-server` may be evaluated later for streaming/server mode.
+
+Discovery authority:
+- Rust/Tauri owns discovery and validation.
+- Frontend must not discover, probe, execute, or validate sidecar binaries.
+- Frontend may show `SidecarBinaryStatus` and may later provide a candidate path only through an explicit file picker or config flow.
+
+Validation gates for future tasks:
+- path exists
+- path is a file
+- path is executable
+- binary name is allowlisted
+- version command can be called safely later
+- path is not inside `node_modules`, `dist`, `.vite`, target output, or Git-tracked model folders
+- path is not a shell string with arguments
+
+Future execution rule:
+- Rust must execute only an allowlisted sidecar binary with structured arguments.
+- Rust must never execute arbitrary frontend-provided command strings.
+- No prompt content may appear in sidecar discovery logs.
+
+### SidecarBinaryConfig
+
+Fields:
+- `binaryId`
+- `binaryKind`
+- `configuredPath`
+- `discoverySource`
+- `validated`
+- `version`
+- `lastCheckedAt`
+
+### SidecarBinaryStatus
+
+Fields:
+- `state`
+- `binaryKind`
+- `path`
+- `version`
+- `message`
+- `recoverable`
+- `userAction`
+
+Status states:
+- `not_configured`
+- `path_missing`
+- `not_executable`
+- `unsupported_binary`
+- `version_unknown`
+- `available`
+- `error`
+
+### SidecarDiscoverySource
+
+Values:
+- `developer_override`
+- `standard_dev_path`
+- `bundled_resource_future`
+- `not_configured`
+
+### Sidecar Discovery Commands
+
+Current mocked command:
+- `get_sidecar_status`
+
+Future commands:
+- `validate_sidecar_path`
+- `set_sidecar_path`
+
+`get_sidecar_status` returns `not_configured` until a future validation task introduces safe path handling.
+
 ## Model Path and Registry Behavior
 
 Phase 1 starts with a user-provided GGUF model path. Cyro does not commit model files and does not download model files in this phase.
