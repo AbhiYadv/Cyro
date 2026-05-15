@@ -9,7 +9,8 @@
 | CYRO-0003 | Runtime Intelligence Layer for Local Brain Phase | task/CYRO-0003-runtime-intelligence-layer | Ready for Review |  | 2026-05-15 | Architecture/contracts only; no llama.cpp, PGLite, sync, mDNS, VPN, provider APIs, or product code |
 | CYRO-0004 | llama.cpp Sidecar ADR and Local Brain Runtime Contract | task/CYRO-0004-llama-sidecar-adr | Merged to dev | 10/10 | 2026-05-15 | Architecture/contracts only; no binaries, model files, downloads, FFI, Python, cloud fallback, or product code |
 | CYRO-0005 | Sidecar Binary Discovery and Build Plan | task/CYRO-0005-sidecar-discovery-strategy | Merged to dev | 10/10 | 2026-05-15 | Defines discovery/status strategy and mocked `get_sidecar_status`; no binary execution or inference |
-| CYRO-0006 | Model Path Validation and Registry Placeholder | task/CYRO-0006-model-path-validation | Ready for Review |  | 2026-05-15 | Rust validates local `.gguf` path, exposes placeholder registry, and adds no model loading, inference, downloads, or binaries |
+| CYRO-0006 | Model Path Validation and Registry Placeholder | task/CYRO-0006-model-path-validation | Merged to dev | 10/10 | 2026-05-15 | Rust validates local `.gguf` path, exposes placeholder registry, and adds no model loading, inference, downloads, or binaries |
+| CYRO-DOCS-0007 | Hermes + OpenHuman Ghost Tree Memory Direction | task/CYRO-DOCS-0007-memory-tracker | Ready for Review |  | 2026-05-15 | Docs/tracker only; locks Ghost Tree memory direction after Local Brain proof |
 | CYRO-0007 | First Local Inference Command | Phase 1 | Planned |  |  | Implements first `send_local_prompt` sidecar command after sidecar and model validation |
 | CYRO-0008 | Streaming and Cancel Contract | Phase 1B | Planned |  |  | Defines token streaming, cancellation, partial output, and process kill strategy |
 | CYRO-0009 | Runtime Benchmark Gate | Phase 1 | Planned |  |  | Records local benchmark evidence before selecting benchmark-gated models |
@@ -30,3 +31,27 @@
 | CYRO-RUNTIME-005 | Benchmark Store and Device Capability Gates | Phase 1 | Planned |  |  | Stores local benchmark evidence for safe runtime selection |
 | CYRO-RUNTIME-006 | Same-Wi-Fi Laptop Node Discovery ADR | Phase 2/3 | Backlog |  |  | Future ADR for discovery only; no mDNS implementation in CYRO-0003 |
 | CYRO-RUNTIME-007 | Trusted Offload Routing Policy | Phase 2/3 | Backlog |  |  | Future trusted laptop route with pairing, approval, and no silent offload |
+| CYRO-MEMORY-001 | Context Capsule Builder ADR | Phase 3 - Ghost Tree Memory | Planned |  |  | Defines how Cyro selects a small relevant memory slice for each prompt |
+| CYRO-MEMORY-002 | Ghost Tree Memory Engine ADR | Phase 3 - Ghost Tree Memory | Planned |  |  | Defines Hermes + OpenHuman-style memory architecture |
+| CYRO-MEMORY-003 | Memory Event and Chunk Contracts | Phase 3 - Ghost Tree Memory | Planned |  |  | Defines memory_events, memory_chunks, memory_candidates, ghost_tree_nodes, context_capsules, and audit log contracts |
+| CYRO-MEMORY-004 | Hermes Personalization Contract | Phase 3 - Ghost Tree Memory | Planned |  |  | Defines user.md, memory.md, projects.md, skills/, preference facts, and approval flow |
+| CYRO-MEMORY-005 | Fast Memory Injection and Hot Cache Design | Phase 3 - Ghost Tree Memory | Planned |  |  | Designs sub-second perceived memory retrieval using hot cache, Ghost Tree, keyword search, and optional derived vector cache |
+| CYRO-MEMORY-006 | Memory Retention and Pruning Policy | Phase 3 - Ghost Tree Memory | Planned |  |  | Defines raw log retention, distilled fact retention, rejected candidate deletion, audit policy, and user controls |
+| CYRO-MEMORY-007 | Phone/Laptop Memory Sync Policy | Phase 5 - Phone + Laptop Offload | Backlog |  |  | Defines hot memory on phone, deep archive on laptop, and sync boundaries |
+| CYRO-AGENT-001 | Cyro Agent Harness ADR | Later | Backlog |  |  | Defines bounded planner, tool registry, permission gate, execution log, and skill recorder before any agent framework |
+| CYRO-AGENT-002 | AgentScope Evaluation | Later | Backlog |  |  | Evaluates AgentScope only after local runtime, memory engine, and tool permission boundaries exist |
+
+## Memory Direction
+
+Cyro Ghost Tree is a Hermes-style personal memory system built on OpenHuman-style compressed memory-tree infrastructure.
+
+Memory direction:
+- Hermes defines what Cyro should remember: user preferences, style, active projects, decisions, recurring workflows, constraints, and reusable skills.
+- OpenHuman-style infrastructure defines how Cyro stores, compresses, searches, and injects memory efficiently.
+- Ghost Tree and Markdown/JSON records are source of truth; vector/search indexes are derived caches only.
+- Cyro targets million-token-scale retained memory as compressed/indexed local storage, not as a single local model context window.
+- 12M-token-scale retained memory is a storage/indexing target, not a promise that local models receive a 12M-token prompt.
+- Context Capsule Builder injects only the relevant selected slice into the model.
+- Context Capsule Builder is tracked before full Ghost Tree implementation.
+- Memory implementation remains after Local Brain runtime proof.
+- AgentScope is deferred until Cyro Agent Harness boundaries are defined.
