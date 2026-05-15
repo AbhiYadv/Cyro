@@ -45,7 +45,17 @@ MVP does not include:
 
 Provider Account Bridge is a future major capability that makes Cyro the private command center for local AI, existing AI accounts, memory, and documents. Users bring their own logged-in provider accounts into Cyro without giving Cyro provider API keys.
 
-The intended user experience is a single Gemini-like chat workspace, not three separate browser tabs. The composer has a route selector for:
+The intended user experience is a single Gemini-like chat workspace, not three separate browser tabs and not a right-side provider-card panel. Provider selection belongs in the Cyro composer.
+
+The composer contract is:
+- left-side plus button for documents and images
+- center Cyro message input
+- right-side provider selector defaulted to Local
+- provider options for Local, ChatGPT, Claude, and Gemini
+- reasoning selector for Fast, Think, and Pro
+- send button at the far right
+
+The composer has a route selector for:
 - Local
 - ChatGPT
 - Claude
@@ -65,6 +75,10 @@ Provider sessions, when implemented, must be isolated, user-visible, and user-au
 
 Provider APIs are not part of Provider Account Bridge. Any API-key or official API provider mode requires a separate future task and architecture approval.
 
+Current approved provider behavior is limited to safe external-browser fallback for ChatGPT, Claude, and Gemini. Cyro opens the provider from an allowlisted route, does not send the prompt automatically, and shows External Provider Opened or an exact error state.
+
+Future embedded provider sessions must be approved through the Provider Account Bridge ADR, Provider Session Container design, and Provider Session Security contract before implementation. Until then, Cyro must not claim that provider chats continue fully inside Cyro.
+
 ### Provider Account Bridge User Stories
 
 - As a user, I can choose Local, ChatGPT, Claude, Gemini, or a future provider from one Cyro composer.
@@ -76,6 +90,9 @@ Provider APIs are not part of Provider Account Bridge. Any API-key or official A
 ### Provider Account Bridge Acceptance Criteria
 
 - Unified composer includes a route selector for Local, ChatGPT, Claude, Gemini, and future providers.
+- Provider selection lives in the composer, not a right panel or browser-tab manager.
+- Current provider routes use external-browser fallback only until embedded sessions are approved.
+- Provider routes do not automatically send prompts.
 - External provider send is preceded by a local Prompt Privacy Filter.
 - Sensitive-data warning offers redact, send as-is, or Local Only.
 - Provider sessions are user-owned and user-authenticated.
