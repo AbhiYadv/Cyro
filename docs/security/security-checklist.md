@@ -52,6 +52,16 @@
 - [ ] No prompt is silently offloaded
 - [ ] User can see why a runtime route was selected
 
+## Sidecar Binary
+- [ ] Rust/Tauri owns sidecar discovery and validation
+- [ ] Frontend does not discover, probe, or execute binaries
+- [ ] Sidecar binary name is allowlisted
+- [ ] Arbitrary shell command strings are rejected
+- [ ] Candidate paths are validated by Rust before use
+- [ ] Discovery does not log prompt content
+- [ ] No sidecar or model binaries are committed
+- [ ] No auto-download is added without an explicit packaging task
+
 ## Git/Release
 - [ ] Task branch from dev
 - [ ] Tests/checks run

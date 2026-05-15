@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+mod sidecar;
+
 #[derive(Serialize)]
 struct HealthCheck {
     health: &'static str,
@@ -75,6 +77,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             health_check,
             get_runtime_status,
+            sidecar::get_sidecar_status,
             send_local_prompt
         ])
         .run(tauri::generate_context!())

@@ -31,6 +31,7 @@ The layer is deterministic. It is not an agent.
 The first real Local Brain implementation route is `local_sidecar`, backed by a supervised `llama.cpp sidecar` process owned by Rust/Tauri.
 
 Runtime Governor must consider sidecar status before selecting `local_sidecar`:
+- `SidecarBinaryStatus`
 - model path configured
 - model path validated
 - model registry entry installed
@@ -39,7 +40,7 @@ Runtime Governor must consider sidecar status before selecting `local_sidecar`:
 - runtime state ready or loadable
 - thermal and battery gates passing
 
-If the sidecar is not configured, invalid, unavailable, loading, generating, errored, or benchmark-blocked, Runtime Governor must return an explainable fallback such as `local_mock`, a lighter local configuration, defer, or user action required.
+If the sidecar binary is not configured, missing, non-executable, unsupported, unavailable, loading, generating, errored, or benchmark-blocked, Runtime Governor must return an explainable fallback such as `local_mock`, a lighter local configuration, defer, or user action required.
 
 Fast, Think, and Pro continue to map to route decisions. They do not map directly to hardcoded model names.
 
