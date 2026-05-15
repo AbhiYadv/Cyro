@@ -6,7 +6,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-const PLACEHOLDER_MODEL_ID: &str = "qwen-0_8b-local";
+pub const PLACEHOLDER_MODEL_ID: &str = "qwen-0_8b-local";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -64,6 +64,24 @@ impl Default for ModelRegistryState {
         Self {
             entries: Mutex::new(initial_model_registry()),
         }
+    }
+}
+
+impl ModelRegistryState {
+    pub fn get_model_entry(
+        &self,
+        model_id: Option<&str>,
+    ) -> Result<Option<ModelRegistryEntry>, String> {
+        let target_model_id = model_id.unwrap_or(PLACEHOLDER_MODEL_ID);
+        let entries = self
+            .entries
+            .lock()
+            .map_err(|_| "Model registry state is unavailable.".to_string())?;
+
+        Ok(entries
+            .iter()
+            .find(|entry| entry.model_id == target_model_id)
+            .cloned())
     }
 }
 

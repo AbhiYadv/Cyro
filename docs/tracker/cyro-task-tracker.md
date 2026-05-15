@@ -10,9 +10,10 @@
 | CYRO-0004 | llama.cpp Sidecar ADR and Local Brain Runtime Contract | task/CYRO-0004-llama-sidecar-adr | Merged to dev | 10/10 | 2026-05-15 | Architecture/contracts only; no binaries, model files, downloads, FFI, Python, cloud fallback, or product code |
 | CYRO-0005 | Sidecar Binary Discovery and Build Plan | task/CYRO-0005-sidecar-discovery-strategy | Merged to dev | 10/10 | 2026-05-15 | Defines discovery/status strategy and mocked `get_sidecar_status`; no binary execution or inference |
 | CYRO-0006 | Model Path Validation and Registry Placeholder | task/CYRO-0006-model-path-validation | Merged to dev | 10/10 | 2026-05-15 | Rust validates local `.gguf` path, exposes placeholder registry, and adds no model loading, inference, downloads, or binaries |
-| CYRO-DOCS-0007 | Hermes + OpenHuman Ghost Tree Memory Direction | task/CYRO-DOCS-0007-memory-tracker | Ready for Review |  | 2026-05-15 | Docs/tracker only; locks Ghost Tree memory direction after Local Brain proof |
-| CYRO-0007 | First Local Inference Command | Phase 1 | Planned |  |  | Implements first `send_local_prompt` sidecar command after sidecar and model validation |
-| CYRO-0008 | Streaming and Cancel Contract | Phase 1B | Planned |  |  | Defines token streaming, cancellation, partial output, and process kill strategy |
+| CYRO-DOCS-0007 | Hermes + OpenHuman Ghost Tree Memory Direction | task/CYRO-DOCS-0007-memory-tracker | Merged to dev | 10/10 | 2026-05-15 | Docs/tracker only; locks Ghost Tree memory direction after Local Brain proof |
+| CYRO-DOCS-0008 | Provider Account Bridge final UX correction | task/CYRO-DOCS-0008-provider-ux-correction | Merged to dev | 10/10 | 2026-05-15 | Docs/tracker only; locks final provider UX as embedded inside Cyro with external browser fallback temporary only |
+| CYRO-0007 | First Local GGUF Prompt via Rust-Supervised Sidecar | task/CYRO-0007-first-local-gguf-prompt | Ready for Review |  | 2026-05-15 | Adds optional non-streaming `llama-cli` prompt path when sidecar/model paths are validated; mock fallback remains for not configured |
+| CYRO-0008 | Streaming, Cancel, and Runtime Error UX Contract | Phase 1B | Planned |  |  | Defines token streaming, cancellation, partial output, process kill strategy, and richer runtime status/error UX |
 | CYRO-0009 | Runtime Benchmark Gate | Phase 1 | Planned |  |  | Records local benchmark evidence before selecting benchmark-gated models |
 | CYRO-PROVIDER-002 | Isolated Provider Session Container Design | Backlog | Planned |  |  | Documents isolated webview/session boundaries without storing provider credentials |
 | CYRO-PROVIDER-003 | Unified Composer Provider Selector UX | Backlog | Planned |  |  | Designs Local/ChatGPT/Claude/Gemini route selector inside one chat UX |
