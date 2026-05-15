@@ -39,10 +39,26 @@ MVP does not include:
 - provider automation
 - AgentScope
 - cloud APIs
-- real local model runtime
 - laptop offload implementation
 - same-Wi-Fi discovery
 - real offline STT/TTS
+
+## Local Brain Phase 1
+
+Local Brain Phase 1 enables offline local model use through a Rust-supervised `llama.cpp sidecar` and a user-provided GGUF model path.
+
+Requirements:
+- user can configure a local GGUF model path
+- Rust validates the model path and owns runtime authority
+- React never talks directly to the model runtime
+- no model files are committed to the repo
+- no model downloads are added in Phase 1
+- no cloud fallback is allowed
+- runtime errors are visible and actionable
+- Runtime Intelligence decides whether the sidecar route is available
+- benchmark gates are required before selecting benchmark-gated models
+
+The current Sprint 0 shell is a demo baseline, not the final Local Brain UX. The Local Brain UX will be redesigned in later implementation tasks.
 
 ## Runtime Intelligence Layer
 
