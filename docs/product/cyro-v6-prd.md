@@ -115,6 +115,10 @@ Provider Account Bridge is a future major capability that makes Cyro the private
 
 The intended user experience is a single Gemini-like chat workspace, not three separate browser tabs and not a right-side provider-card panel. Provider selection belongs in the Cyro composer.
 
+Final Provider Account Bridge UX target: ChatGPT, Claude, Gemini, and future providers open inside Cyro's chat-first UX, not as separate browser windows.
+
+The end-user product experience is that a user can choose ChatGPT, Claude, Gemini, or a future provider from the composer and continue in a visible, isolated, user-owned provider session inside Cyro. The user should not have to leave Cyro for normal Provider Account Bridge use.
+
 The composer contract is:
 - left-side plus button for documents and images
 - center Cyro message input
@@ -139,13 +143,17 @@ Cyro controls:
 - user-approved memory proposal flow
 - sync of Cyro-owned memory/config/history only
 
+Cyro remains the control plane for memory, vault, privacy filtering, provider route selection, and context capsule preparation.
+
 Provider sessions, when implemented, must be isolated, user-visible, and user-authenticated. The user logs in manually. Cyro must not store provider passwords, export provider cookies, manipulate provider cookies, bypass CAPTCHA, bypass rate limits, bypass provider terms, or automate hidden provider activity.
 
 Provider APIs are not part of Provider Account Bridge. Any API-key or official API provider mode requires a separate future task and architecture approval.
 
-Current approved provider behavior is limited to safe external-browser fallback for ChatGPT, Claude, and Gemini. Cyro opens the provider from an allowlisted route, does not send the prompt automatically, and shows External Provider Opened or an exact error state.
+Current temporary provider behavior is limited to safe external-browser fallback for ChatGPT, Claude, and Gemini. Cyro opens the provider from an allowlisted route, does not send the prompt automatically, and shows External Provider Opened or an exact error state.
 
-Future embedded provider sessions must be approved through the Provider Account Bridge ADR, Provider Session Container design, and Provider Session Security contract before implementation. Until then, Cyro must not claim that provider chats continue fully inside Cyro.
+External browser fallback is temporary and only used when embedded provider session is unavailable, blocked, or not yet implemented.
+
+Future embedded provider sessions must be approved through the Provider Account Bridge ADR, Provider Session Container design, and Provider Session Security contract before implementation. Until then, Cyro must not claim that provider chats continue fully inside Cyro. Provider-owned content must remain visible and user-controlled inside an isolated Cyro provider surface.
 
 ### Provider Account Bridge User Stories
 
@@ -159,7 +167,8 @@ Future embedded provider sessions must be approved through the Provider Account 
 
 - Unified composer includes a route selector for Local, ChatGPT, Claude, Gemini, and future providers.
 - Provider selection lives in the composer, not a right panel or browser-tab manager.
-- Current provider routes use external-browser fallback only until embedded sessions are approved.
+- Final product provider routes open inside Cyro's chat-first UX through visible isolated provider sessions.
+- External browser fallback is temporary and only used when embedded provider session is unavailable, blocked, or not yet implemented.
 - Provider routes do not automatically send prompts.
 - External provider send is preceded by a local Prompt Privacy Filter.
 - Sensitive-data warning offers redact, send as-is, or Local Only.
