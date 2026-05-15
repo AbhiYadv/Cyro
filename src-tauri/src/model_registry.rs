@@ -68,6 +68,15 @@ impl Default for ModelRegistryState {
 }
 
 impl ModelRegistryState {
+    pub fn entries(&self) -> Result<Vec<ModelRegistryEntry>, String> {
+        let entries = self
+            .entries
+            .lock()
+            .map_err(|_| "Model registry state is unavailable.".to_string())?;
+
+        Ok(entries.clone())
+    }
+
     pub fn get_model_entry(
         &self,
         model_id: Option<&str>,
@@ -113,12 +122,7 @@ pub fn validate_model_path(path: String) -> ModelPathValidationResult {
 pub fn get_model_registry(
     registry: tauri::State<'_, ModelRegistryState>,
 ) -> Result<Vec<ModelRegistryEntry>, String> {
-    let entries = registry
-        .entries
-        .lock()
-        .map_err(|_| "Model registry state is unavailable.".to_string())?;
-
-    Ok(entries.clone())
+    registry.entries()
 }
 
 #[tauri::command]

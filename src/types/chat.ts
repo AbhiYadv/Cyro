@@ -8,5 +8,7 @@ export type ChatMessage = {
   body: string;
   mode?: RuntimeMode;
   route?: RuntimeRoute;
+  modelId?: string;
+  elapsedMs?: number;
   mocked?: boolean;
 };

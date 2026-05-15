@@ -352,9 +352,40 @@ These flags are not user-controlled. They keep the first prompt path bounded, pr
 
 The first proof uses conservative max tokens with a default of `120` and an upper bound of `256`. The command has a timeout and returns actionable `RuntimeError` values for missing sidecar, invalid model, timeout, nonzero exit, empty response, or process wait failure.
 
-Streaming is still future work. `llama-server`, token streaming, cancellation UX, partial output, richer runtime status, and model lifecycle controls remain CYRO-0008 or later.
+Streaming is still future work. `llama-server`, token streaming, cancellation UX, partial output, richer process lifecycle state, and model lifecycle controls remain CYRO-0010 or later.
 
 The provided tiny `0.5B` GGUF test model is a runtime proof only. Output quality from that test model is not representative of final Local Brain answer quality.
+
+## CYRO-0008 Runtime Status and Manual Path Setup Flow
+
+CYRO-0008 makes the CYRO-0007 sidecar route usable from the desktop shell without adding streaming, benchmark gates, model downloads, bundled binaries, or new inference modes.
+
+Manual setup flow:
+- user enters a local `llama-cli` path in the Runtime panel
+- React sends the candidate path to Rust through `validate_sidecar_path`
+- Rust validates the path, executable bit, binary name allowlist, and generated-directory exclusions
+- if validation succeeds, React calls `set_sidecar_path` so Rust stores the validated path in runtime state
+- user enters a local `.gguf` model path in the Runtime panel
+- React sends the candidate path to Rust through `validate_model_path`
+- Rust validates that the path is local, readable, a file, and `.gguf`
+- if validation succeeds, React calls `set_model_path` so Rust stores metadata in the placeholder model registry
+
+Runtime status behavior:
+- `get_runtime_status` combines `SidecarBinaryStatus`, placeholder model registry state, and active route readiness
+- when neither path is configured, status is `not_configured` and route is `local_mock`
+- when only `llama-cli` is validated, status is `sidecar_ready` and route remains `local_mock`
+- when only the model path is validated, status is `model_valid` and route remains `local_mock`
+- when both are validated, status is `ready` and route is `local_sidecar`
+- chat responses must show whether they came from `local_mock` or `local_sidecar`
+- local sidecar responses include model id and elapsed time metadata where available
+
+Runtime error UX:
+- missing sidecar, missing model, invalid path, timeout, nonzero exit, and empty response remain user-actionable
+- errors surface safe messages and user actions
+- prompt content is not logged or shown in debug detail by default
+- React does not validate filesystem paths and does not execute binaries
+
+Streaming, cancellation controls, richer process lifecycle state, benchmark gates, durable config persistence, model picker UX, and final Local Brain UX remain future tasks.
 
 ## LocalModelConfig
 
@@ -483,5 +514,6 @@ Recommended sequence:
 1. Sidecar binary discovery/build plan.
 2. Model path validation.
 3. First local inference command.
-4. Streaming and cancellation contract.
+4. Runtime status/error UX and manual path setup flow.
 5. Runtime benchmark gate.
+6. Streaming and cancellation contract.

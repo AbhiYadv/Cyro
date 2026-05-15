@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { placeholderModelRegistry } from "./modelRegistry";
+import { mockedSidecarStatus } from "./sidecar";
 import type { HealthCheck, LocalPromptResponse, RuntimeCommandError, RuntimeMode, RuntimeStatus } from "../types/runtime";
 
 type CommandArgs = Record<string, unknown>;
@@ -9,6 +11,13 @@ const mockedRuntimeStatus: RuntimeStatus = {
   modelLoaded: false,
   modelName: null,
   mode: "fast",
+  runtimeState: "not_configured",
+  activeRoute: "local_mock",
+  routeExplanation: "Local Brain is not configured. Cyro will use the local mock fallback.",
+  sidecar: mockedSidecarStatus,
+  localModel: placeholderModelRegistry[0],
+  modelRegistry: placeholderModelRegistry,
+  lastError: null,
   network: "disabled",
   vault: "not_indexed",
   memory: "local_only",
@@ -85,6 +94,10 @@ export async function sendLocalPrompt(prompt: string, mode: RuntimeMode, invoker
 export function formatRuntimeError(error: unknown, fallback = "The local runtime command failed.") {
   if (error instanceof Error) {
     return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
   }
 
   if (error && typeof error === "object") {

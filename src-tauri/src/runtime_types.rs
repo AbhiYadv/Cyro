@@ -16,6 +16,18 @@ pub enum RuntimeRoute {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub enum RuntimeState {
+    NotConfigured,
+    SidecarReady,
+    ModelValid,
+    Ready,
+    Generating,
+    Error,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FinishReason {
     Completed,
     MockFallback,

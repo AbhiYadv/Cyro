@@ -74,6 +74,16 @@
 - [ ] Stderr/debug output is bounded and prompt-redacted before surfacing
 - [ ] Streaming and cancellation UX remain future work
 
+## Runtime Setup UI
+- [ ] Sidecar path validation is invoked through Rust/Tauri only
+- [ ] Model path validation is invoked through Rust/Tauri only
+- [ ] React never executes binaries or validates filesystem metadata directly
+- [ ] Runtime status clearly distinguishes `local_mock` from `local_sidecar`
+- [ ] Local sidecar readiness requires both validated `llama-cli` and validated `.gguf` model path
+- [ ] Invalid path, timeout, nonzero exit, missing sidecar, and missing model errors include user actions
+- [ ] Prompt content is not logged by default
+- [ ] No model files, sidecar binaries, downloads, cloud fallback, telemetry, or provider APIs are added by setup UI
+
 ## Model Path Validation
 - [ ] Rust/Tauri validates all model filesystem paths
 - [ ] Frontend does not validate filesystem paths directly
