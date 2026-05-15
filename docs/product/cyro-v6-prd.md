@@ -21,6 +21,45 @@ Users repeatedly explain the same personal/project context across multiple AI ap
 
 Cyro remembers what the user approves, compresses it into structured local memory, carries a compact snapshot on phone, and prepares the right context for any AI workflow. Provider Account Bridge extends that promise by letting users route a prompt from one Cyro composer to Local, ChatGPT, Claude, Gemini, or future providers while Cyro owns the memory, vault, privacy filter, routing policy, and sync layer.
 
+## Ghost Tree Memory Engine
+
+Cyro Ghost Tree is a Hermes-style personal memory system built on OpenHuman-style compressed memory-tree infrastructure.
+
+Hermes-style personalization defines what Cyro should remember:
+- preferences
+- style
+- active projects
+- decisions
+- recurring workflows
+- constraints
+- reusable skills
+- approved facts about people, documents, tools, organizations, and topics
+
+OpenHuman-style infrastructure defines how Cyro stores, compresses, searches, and injects memory:
+- raw events
+- canonical chunks
+- scored memory candidates
+- hierarchical summaries
+- Ghost Tree source records
+- Context Capsules
+- optional derived search/vector caches
+
+Cyro targets million-token-scale retained memory as compressed/indexed local storage, not as a single local model context window. A 12M-token-scale memory target means retained, compressed, indexed local storage that can be searched and summarized. It does not mean the local model receives a 12M-token prompt.
+
+Context Capsule Builder injects only the relevant selected slice into the model. Initial capsules should stay small enough for local runtime constraints, with a practical first target around 1k-8k tokens.
+
+User memory control requirements:
+- users can inspect approved memory
+- users can approve or reject memory candidates
+- users can edit memory records
+- users can delete memory records
+- users can export memory records
+- users can audit source, confidence, sensitivity, status, timestamp, and stale/superseded state
+
+Ghost Tree and Markdown/JSON records are source of truth; vector/search indexes are derived caches only.
+
+Memory implementation follows Local Brain runtime proof. Context Capsule Builder should be designed before full Ghost Tree implementation. AgentScope is deferred until Cyro Agent Harness boundaries are defined.
+
 ## MVP Scope
 
 MVP focuses on:

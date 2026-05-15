@@ -32,8 +32,13 @@
 
 ## Phase 3 — Ghost Tree Memory
 
-- memory contracts
-- context capsule service
+- Context Capsule Builder ADR
+- context capsule service before full Ghost Tree implementation
+- Ghost Tree Memory Engine ADR
+- Hermes personalization contract
+- memory event and chunk contracts
+- fast memory injection and hot cache design
+- memory retention and pruning policy
 - memory compiler service
 - import service
 - temporal/stale memory service
@@ -41,6 +46,9 @@
 - Memory Inspector
 - Import-to-Memory Sheet
 - Mobile Snapshot Status
+- Ghost Tree and Markdown/JSON records as source of truth
+- vector/search indexes as derived rebuildable caches only
+- million-token-scale retained memory as storage/index, not model context
 
 ## Phase 4 — Vault + PageIndex
 
@@ -80,13 +88,16 @@
 
 - VPN
 - VSN
-- AgentScope
+- Cyro Agent Harness ADR
+- AgentScope evaluation
 - embedded provider sessions
 - cloud APIs
 - MCP production tools
 - offline STT/TTS
 - large local models beyond approved resource gates
 - autonomous agents
+
+AgentScope is deferred until Cyro Agent Harness boundaries are defined.
 
 ## Backlog — Provider Account Bridge
 
@@ -111,3 +122,15 @@ All Provider Account Bridge implementation tasks are future/backlog work and do 
 - Trusted Offload Routing Policy
 
 Runtime Intelligence implementation must stay resource-aware and user-visible. Laptop offload remains future work until trusted pairing and explicit approval are designed.
+
+## Backlog — Ghost Tree Memory
+
+- Context Capsule Builder ADR
+- Ghost Tree Memory Engine ADR
+- Memory Event and Chunk Contracts
+- Hermes Personalization Contract
+- Fast Memory Injection and Hot Cache Design
+- Memory Retention and Pruning Policy
+- Phone/Laptop Memory Sync Policy
+
+Ghost Tree Memory follows Local Brain runtime proof. Context Capsule Builder comes before full Ghost Tree implementation.
