@@ -17,6 +17,18 @@ Cyro selects runtime routes by resource policy and user consent, not by fixed mo
 - Low battery must prefer lighter local fallback or defer.
 - User must be able to see why Cyro selected a route.
 
+## Local Brain Sidecar Rules
+
+- `local_sidecar` is the first real Local Brain implementation route.
+- `local_mock` remains demo baseline only.
+- Sidecar process must be launched and supervised by Rust, not React.
+- Rust must validate model path, model metadata, runtime state, and benchmark gate before selecting sidecar.
+- No model files committed.
+- No cloud fallback for Local Brain.
+- No prompt sent to network.
+- No shell command injection through model path or prompt.
+- Sidecar logs must not include prompt content by default.
+
 ## Offload Rules
 
 - Laptop offload is future work and requires explicit trusted device pairing.

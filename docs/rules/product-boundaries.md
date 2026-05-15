@@ -36,3 +36,13 @@ Runtime Intelligence boundaries:
 - Laptop offload requires future trusted pairing and explicit approval.
 - No prompt may be silently offloaded.
 - Same-Wi-Fi discovery, mDNS, sync, VPN, PGLite, and llama.cpp implementation require separate future tasks.
+
+Local Brain sidecar boundaries:
+- No model files committed.
+- No model downloads without a separate approved task.
+- No cloud fallback for Local Brain.
+- No React direct access to model runtime.
+- Rust owns runtime authority.
+- Sidecar process must be supervised by Rust.
+- All model paths must be validated by Rust.
+- Sidecar logs must not include prompt content by default.

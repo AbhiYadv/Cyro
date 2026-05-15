@@ -7,6 +7,12 @@
 | CYRO-DOCS-0003 | Provider Account Bridge requirements | task/CYRO-DOCS-0003-provider-account-bridge | Merged to dev | 10/10 | 2026-05-15 | Docs/tracker only |
 | CYRO-PROVIDER-001 | Embedded Provider Session ADR and Chat-First UX Contract | task/CYRO-PROVIDER-001-embedded-session-adr | Ready for Review |  | 2026-05-15 | ADR/security/session-container docs only; separates current external fallback from future embedded session |
 | CYRO-0003 | Runtime Intelligence Layer for Local Brain Phase | task/CYRO-0003-runtime-intelligence-layer | Ready for Review |  | 2026-05-15 | Architecture/contracts only; no llama.cpp, PGLite, sync, mDNS, VPN, provider APIs, or product code |
+| CYRO-0004 | llama.cpp Sidecar ADR and Local Brain Runtime Contract | task/CYRO-0004-llama-sidecar-adr | Ready for Review |  | 2026-05-15 | Architecture/contracts only; no binaries, model files, downloads, FFI, Python, cloud fallback, or product code |
+| CYRO-0005 | Sidecar Binary Discovery and Build Plan | Phase 1 | Planned |  |  | Defines packaging/discovery plan for llama.cpp sidecar without committing binaries |
+| CYRO-0006 | Model Path Validation | Phase 1 | Planned |  |  | Rust validates user-provided GGUF path, metadata, size, and safe error behavior |
+| CYRO-0007 | First Local Inference Command | Phase 1 | Planned |  |  | Implements first `send_local_prompt` sidecar command after model validation |
+| CYRO-0008 | Streaming and Cancel Contract | Phase 1B | Planned |  |  | Defines token streaming, cancellation, partial output, and process kill strategy |
+| CYRO-0009 | Runtime Benchmark Gate | Phase 1 | Planned |  |  | Records local benchmark evidence before selecting benchmark-gated models |
 | CYRO-PROVIDER-002 | Isolated Provider Session Container Design | Backlog | Planned |  |  | Documents isolated webview/session boundaries without storing provider credentials |
 | CYRO-PROVIDER-003 | Unified Composer Provider Selector UX | Backlog | Planned |  |  | Designs Local/ChatGPT/Claude/Gemini route selector inside one chat UX |
 | CYRO-PROVIDER-004 | Prompt Privacy Scanner | Backlog | Planned |  |  | Defines local scan for secrets/PII/internal data before provider send |
