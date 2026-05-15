@@ -175,6 +175,8 @@ Future commands:
 
 Phase 1 starts with a user-provided GGUF model path. Cyro does not commit model files and does not download model files in this phase.
 
+CYRO-0006 implements model path validation and a placeholder model registry only. It does not load a model, execute llama.cpp, run inference, parse GGUF contents, compute model hashes, download models, or add durable registry persistence.
+
 Model path rules:
 - filesystem paths are validated by Rust
 - arbitrary frontend URLs are rejected
@@ -182,6 +184,8 @@ Model path rules:
 - extension and file metadata must match allowed GGUF expectations
 - path must not be interpolated into a shell command
 - invalid path returns a recoverable runtime error
+- `.gguf` is the only supported model extension for the first Local Brain path validation task
+- command-like strings, URL-like strings, and paths with shell arguments are rejected before filesystem lookup
 
 Model registry behavior:
 - `LocalModelConfig` records configured local models
@@ -190,6 +194,62 @@ Model registry behavior:
 - installed means "known and locally present", not "loaded"
 - validated means Rust has checked file existence and metadata
 - benchmark gates still apply before Runtime Governor selects the model
+- CYRO-0006 uses an in-memory placeholder registry that can reset on app restart
+- initial placeholder model id is `qwen-0_8b-local`
+
+### ModelPathValidationResult
+
+Fields:
+- `valid`
+- `state`
+- `path`
+- `fileName`
+- `extension`
+- `fileSizeMb`
+- `readable`
+- `isFile`
+- `message`
+- `recoverable`
+- `userAction`
+
+`ModelPathState` values:
+- `not_configured`
+- `path_missing`
+- `not_file`
+- `not_readable`
+- `unsupported_extension`
+- `valid_gguf`
+- `error`
+
+### ModelRegistryEntry
+
+CYRO-0006 placeholder fields:
+- `modelId`
+- `displayName`
+- `family`
+- `parameterClass`
+- `quantization`
+- `filePath`
+- `fileName`
+- `contextWindow`
+- `installed`
+- `validated`
+- `fileSizeMb`
+- `minRamMb`
+- `recommendedRamMb`
+- `lastValidatedAt`
+
+Current placeholder:
+- `modelId`: `qwen-0_8b-local`
+- `displayName`: `Qwen 0.8B Local`
+- `family`: `qwen`
+- `parameterClass`: `0.8B`
+- `quantization`: `unknown_until_path_validated`
+- `contextWindow`: `4096`
+- `installed`: `false`
+- `validated`: `false`
+- `minRamMb`: `2048`
+- `recommendedRamMb`: `4096`
 
 ## Runtime States
 
@@ -249,6 +309,7 @@ Future routes are not implemented by this ADR. No silent offload is allowed.
 Command contracts:
 - `get_runtime_status`
 - `validate_model_path`
+- `get_model_registry`
 - `set_model_path`
 - `load_local_model`
 - `unload_local_model`

@@ -62,6 +62,16 @@
 - [ ] No sidecar or model binaries are committed
 - [ ] No auto-download is added without an explicit packaging task
 
+## Model Path Validation
+- [ ] Rust/Tauri validates all model filesystem paths
+- [ ] Frontend does not validate filesystem paths directly
+- [ ] URL-like model paths such as `http://`, `https://`, and `file://` are rejected
+- [ ] Command-like strings and shell arguments are rejected before filesystem lookup
+- [ ] Candidate path must exist, be a file, be readable, and use `.gguf`
+- [ ] Validation records file metadata only; it does not parse, hash, load, or execute the model
+- [ ] Model files remain ignored by Git, including `*.gguf`, `*.bin`, and `*.safetensors`
+- [ ] No model download, cloud fallback, or inference is added by validation tasks
+
 ## Git/Release
 - [ ] Task branch from dev
 - [ ] Tests/checks run
