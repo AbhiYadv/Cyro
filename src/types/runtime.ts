@@ -1,12 +1,23 @@
+import type { ModelRegistryEntry } from "./modelRegistry";
+import type { SidecarBinaryStatus } from "./sidecar";
+
 export type RuntimeMode = "fast" | "thinking";
 export type RuntimeRoute = "local_mock" | "local_sidecar";
+export type RuntimeState = "not_configured" | "sidecar_ready" | "model_valid" | "ready" | "generating" | "error";
 export type FinishReason = "completed" | "mock_fallback";
 
 export type RuntimeStatus = {
   health: "ok";
-  modelLoaded: false;
+  modelLoaded: boolean;
   modelName: string | null;
   mode: RuntimeMode;
+  runtimeState: RuntimeState;
+  activeRoute: RuntimeRoute;
+  routeExplanation: string;
+  sidecar: SidecarBinaryStatus;
+  localModel: ModelRegistryEntry | null;
+  modelRegistry: ModelRegistryEntry[];
+  lastError: RuntimeCommandError | null;
   network: "disabled";
   vault: "not_indexed";
   memory: "local_only";

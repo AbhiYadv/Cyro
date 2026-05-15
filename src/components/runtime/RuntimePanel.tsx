@@ -1,22 +1,53 @@
-import { FormEvent, useState } from "react";
-import { setModelPath } from "../../services/modelRegistry";
-import { setSidecarPath } from "../../services/sidecar";
+import { FormEvent, useEffect, useState } from "react";
+import { setModelPath, validateModelPath } from "../../services/modelRegistry";
+import {
+  composeActionableMessage,
+  formatModelFile,
+  isLocalRuntimeReady,
+  routeLabel,
+  runtimeStateLabel
+} from "../../services/runtimeStatus";
+import { setSidecarPath, validateSidecarPath } from "../../services/sidecar";
 import { formatRuntimeError } from "../../services/tauriClient";
+import type { ModelPathValidationResult } from "../../types/modelRegistry";
 import type { RuntimeStatus } from "../../types/runtime";
+import type { SidecarBinaryStatus } from "../../types/sidecar";
 
 type RuntimePanelProps = {
   status: RuntimeStatus;
+  onStatusRefresh: () => Promise<RuntimeStatus>;
 };
 
-export function RuntimePanel({ status }: RuntimePanelProps) {
-  const [sidecarPath, setSidecarPathInput] = useState("");
-  const [modelPath, setModelPathInput] = useState("");
+function validationLabel(state: string) {
+  if (state === "valid_gguf") {
+    return "Valid GGUF";
+  }
+
+  return state
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatMode(mode: RuntimeStatus["mode"]) {
+  return mode === "fast" ? "Fast" : "Thinking";
+}
+
+export function RuntimePanel({ status, onStatusRefresh }: RuntimePanelProps) {
+  const [sidecarPath, setSidecarPathInput] = useState(status.sidecar.path ?? "");
+  const [modelPath, setModelPathInput] = useState(status.localModel?.filePath ?? "");
+  const [sidecarValidation, setSidecarValidation] = useState<SidecarBinaryStatus | null>(status.sidecar);
+  const [modelValidation, setModelValidation] = useState<ModelPathValidationResult | null>(null);
   const [configStatus, setConfigStatus] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
-  const [isConfiguring, setIsConfiguring] = useState(false);
+  const [activeAction, setActiveAction] = useState<"sidecar" | "model" | null>(null);
+  const runtimeReady = isLocalRuntimeReady(status);
   const rows = [
-    ["Model", status.modelLoaded ? status.modelName ?? "Loaded" : "Not Loaded"],
-    ["Mode", status.mode === "fast" ? "Fast" : "Thinking"],
+    ["Runtime", runtimeStateLabel(status.runtimeState)],
+    ["Route", routeLabel(status.activeRoute)],
+    ["Model", status.localModel?.validated ? status.localModel.displayName : "Not Configured"],
+    ["Model File", formatModelFile(status.localModel)],
+    ["Mode", formatMode(status.mode)],
     ["Context Window", "Placeholder"],
     ["Vault", "Not Indexed"],
     ["Memory", "Local Only"],
@@ -24,29 +55,75 @@ export function RuntimePanel({ status }: RuntimePanelProps) {
     ["Privacy", "Offline"]
   ];
 
-  async function handleRuntimeConfig(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    setSidecarPathInput((current) => current || status.sidecar.path || "");
+    setModelPathInput((current) => current || status.localModel?.filePath || "");
+    setSidecarValidation(status.sidecar);
+  }, [status.sidecar, status.localModel?.filePath]);
+
+  async function handleSidecarValidation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedSidecarPath = sidecarPath.trim();
-    const trimmedModelPath = modelPath.trim();
-    if (!trimmedSidecarPath || !trimmedModelPath) {
+    if (!trimmedSidecarPath) {
       setConfigStatus(null);
-      setConfigError("Enter both local runtime paths.");
+      setConfigError("Enter a local llama-cli path.");
       return;
     }
 
-    setIsConfiguring(true);
+    setActiveAction("sidecar");
     setConfigStatus(null);
     setConfigError(null);
 
     try {
+      const validation = await validateSidecarPath(trimmedSidecarPath);
+      setSidecarValidation(validation);
+
+      if (validation.state !== "available") {
+        setConfigError(composeActionableMessage(validation.message, validation.userAction));
+        return;
+      }
+
       await setSidecarPath(trimmedSidecarPath);
-      await setModelPath("qwen-0_8b-local", trimmedModelPath);
-      setConfigStatus("Local sidecar ready");
+      await onStatusRefresh();
+      setConfigStatus("Sidecar Ready");
     } catch (error) {
-      setConfigError(formatRuntimeError(error, "Local runtime configuration failed."));
+      setConfigError(formatRuntimeError(error, "Sidecar validation failed."));
     } finally {
-      setIsConfiguring(false);
+      setActiveAction(null);
+    }
+  }
+
+  async function handleModelValidation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const trimmedModelPath = modelPath.trim();
+    if (!trimmedModelPath) {
+      setConfigStatus(null);
+      setConfigError("Enter a local GGUF model path.");
+      return;
+    }
+
+    setActiveAction("model");
+    setConfigStatus(null);
+    setConfigError(null);
+
+    try {
+      const validation = await validateModelPath(trimmedModelPath);
+      setModelValidation(validation);
+
+      if (!validation.valid) {
+        setConfigError(composeActionableMessage(validation.message, validation.userAction));
+        return;
+      }
+
+      await setModelPath("qwen-0_8b-local", trimmedModelPath);
+      await onStatusRefresh();
+      setConfigStatus("Model Valid");
+    } catch (error) {
+      setConfigError(formatRuntimeError(error, "Model validation failed."));
+    } finally {
+      setActiveAction(null);
     }
   }
 
@@ -55,6 +132,11 @@ export function RuntimePanel({ status }: RuntimePanelProps) {
       <div className="panel-header">
         <p className="eyebrow">Runtime Status</p>
         <h2>{status.health.toUpperCase()}</h2>
+      </div>
+
+      <div className={runtimeReady ? "runtime-readiness ready" : "runtime-readiness"}>
+        <strong>{runtimeStateLabel(status.runtimeState)}</strong>
+        <span>{status.routeExplanation}</span>
       </div>
 
       <div className="runtime-list">
@@ -66,32 +148,55 @@ export function RuntimePanel({ status }: RuntimePanelProps) {
         ))}
       </div>
 
-      <form className="runtime-config" onSubmit={handleRuntimeConfig}>
-        <p className="eyebrow">Local Runtime</p>
-        <input
-          aria-label="llama-cli path"
-          placeholder="/path/to/llama-cli"
-          value={sidecarPath}
-          onChange={(event) => setSidecarPathInput(event.target.value)}
-          disabled={isConfiguring}
-        />
-        <input
-          aria-label="GGUF model path"
-          placeholder="/path/to/model.gguf"
-          value={modelPath}
-          onChange={(event) => setModelPathInput(event.target.value)}
-          disabled={isConfiguring}
-        />
-        <button type="submit" disabled={isConfiguring}>
-          {isConfiguring ? "Validating" : "Configure"}
-        </button>
+      <section className="runtime-config" aria-label="Local Brain setup">
+        <p className="eyebrow">Local Brain Setup</p>
+
+        <form className="runtime-path-form" onSubmit={handleSidecarValidation}>
+          <label htmlFor="sidecar-path">Sidecar path</label>
+          <div className="runtime-path-row">
+            <input
+              id="sidecar-path"
+              aria-label="llama-cli path"
+              placeholder="/path/to/llama-cli"
+              value={sidecarPath}
+              onChange={(event) => setSidecarPathInput(event.target.value)}
+              disabled={activeAction !== null}
+            />
+            <button type="submit" disabled={activeAction !== null}>
+              {activeAction === "sidecar" ? "Checking" : "Validate Sidecar"}
+            </button>
+          </div>
+          <span className="path-state">{sidecarValidation ? validationLabel(sidecarValidation.state) : "Not Configured"}</span>
+        </form>
+
+        <form className="runtime-path-form" onSubmit={handleModelValidation}>
+          <label htmlFor="model-path">Model path</label>
+          <div className="runtime-path-row">
+            <input
+              id="model-path"
+              aria-label="GGUF model path"
+              placeholder="/path/to/model.gguf"
+              value={modelPath}
+              onChange={(event) => setModelPathInput(event.target.value)}
+              disabled={activeAction !== null}
+            />
+            <button type="submit" disabled={activeAction !== null}>
+              {activeAction === "model" ? "Checking" : "Validate Model"}
+            </button>
+          </div>
+          <span className="path-state">
+            {modelValidation ? validationLabel(modelValidation.state) : status.localModel?.validated ? "Valid GGUF" : "Not Configured"}
+          </span>
+        </form>
+
+        {status.localModel?.validated ? <span className="config-status">{formatModelFile(status.localModel)}</span> : null}
         {configStatus ? <span className="config-status">{configStatus}</span> : null}
         {configError ? (
           <span className="config-error" role="alert">
             {configError}
           </span>
         ) : null}
-      </form>
+      </section>
 
       <div className="privacy-callout">
         <strong>Local authority boundary</strong>

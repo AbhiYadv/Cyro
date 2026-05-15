@@ -1,11 +1,13 @@
 import { FormEvent, useState } from "react";
+import { routeLabel } from "../../services/runtimeStatus";
 import { formatRuntimeError, sendLocalPrompt } from "../../services/tauriClient";
 import type { ChatMessage } from "../../types/chat";
-import type { RuntimeMode, RuntimeRoute } from "../../types/runtime";
+import type { RuntimeMode } from "../../types/runtime";
 
 type ChatWorkspaceProps = {
   mode: RuntimeMode;
   onModeChange: (mode: RuntimeMode) => void;
+  onPromptComplete?: () => Promise<unknown>;
 };
 
 const initialMessages: ChatMessage[] = [
@@ -19,15 +21,25 @@ const initialMessages: ChatMessage[] = [
   }
 ];
 
-function routeLabel(route?: RuntimeRoute) {
-  if (route === "local_sidecar") {
-    return "Local Sidecar";
+function messageMetadata(message: ChatMessage) {
+  const details = [];
+
+  if (message.route) {
+    details.push(routeLabel(message.route));
   }
 
-  return "Local Mock";
+  if (message.modelId) {
+    details.push(message.modelId);
+  }
+
+  if (typeof message.elapsedMs === "number" && message.elapsedMs > 0) {
+    details.push(`${message.elapsedMs}ms`);
+  }
+
+  return details.join(" · ");
 }
 
-export function ChatWorkspace({ mode, onModeChange }: ChatWorkspaceProps) {
+export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -70,12 +82,19 @@ export function ChatWorkspace({ mode, onModeChange }: ChatWorkspaceProps) {
           body: result.response,
           mode: result.mode,
           route: result.route,
+          modelId: result.modelId ?? undefined,
+          elapsedMs: result.elapsedMs,
           mocked: result.mocked
         }
       ]);
     } catch (caughtError) {
       setError(formatRuntimeError(caughtError));
     } finally {
+      try {
+        await onPromptComplete?.();
+      } catch {
+        // Runtime status refresh is secondary to the prompt result.
+      }
       setIsLoading(false);
     }
   }
@@ -106,7 +125,7 @@ export function ChatWorkspace({ mode, onModeChange }: ChatWorkspaceProps) {
           <article className={`message-bubble ${message.role}`} key={message.id}>
             <span className="message-role">{message.role === "user" ? "You" : "Cyro"}</span>
             <p>{message.body}</p>
-            {message.role === "assistant" ? <span className="route-label">{routeLabel(message.route)}</span> : null}
+            {message.role === "assistant" ? <span className="route-label">{messageMetadata(message)}</span> : null}
             {message.mocked ? <span className="mock-label">Mocked</span> : null}
           </article>
         ))}

@@ -18,11 +18,36 @@ describe("tauriClient Sprint 0 contract", () => {
       health: "ok",
       modelLoaded: false,
       modelName: null,
+      runtimeState: "not_configured",
+      activeRoute: "local_mock",
       network: "disabled",
       vault: "not_indexed",
       memory: "local_only",
       sync: "disabled",
       privacy: "offline"
+    });
+  });
+
+  it("surfaces local_sidecar response metadata from Tauri", async () => {
+    const invoker: TauriInvoker = async <T>(command: string) => {
+      expect(command).toBe("send_local_prompt");
+      return {
+        response: "local answer",
+        modelId: "qwen-0_8b-local",
+        mode: "fast",
+        route: "local_sidecar",
+        elapsedMs: 42,
+        finishReason: "completed",
+        mocked: false
+      } as T;
+    };
+
+    const response = await sendLocalPrompt("Answer locally", "fast", invoker);
+
+    expect(response).toMatchObject({
+      route: "local_sidecar",
+      modelId: "qwen-0_8b-local",
+      mocked: false
     });
   });
 
@@ -52,5 +77,11 @@ describe("tauriClient Sprint 0 contract", () => {
         userAction: "Try a shorter prompt."
       })
     ).toBe("The local llama.cpp sidecar timed out. Try a shorter prompt.");
+  });
+
+  it("formats direct string command errors from Tauri", () => {
+    expect(formatRuntimeError("Model path does not exist. Select an existing local .gguf file.")).toBe(
+      "Model path does not exist. Select an existing local .gguf file."
+    );
   });
 });
