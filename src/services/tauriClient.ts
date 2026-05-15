@@ -1,7 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { placeholderModelRegistry } from "./modelRegistry";
 import { mockedSidecarStatus } from "./sidecar";
-import type { HealthCheck, LocalPromptResponse, RuntimeCommandError, RuntimeMode, RuntimeStatus } from "../types/runtime";
+import type {
+  HealthCheck,
+  LocalPromptResponse,
+  RuntimeBenchmarkResult,
+  RuntimeCommandError,
+  RuntimeMode,
+  RuntimeStatus
+} from "../types/runtime";
 
 type CommandArgs = Record<string, unknown>;
 export type TauriInvoker = <T>(command: string, args?: CommandArgs) => Promise<T>;
@@ -17,6 +24,11 @@ const mockedRuntimeStatus: RuntimeStatus = {
   sidecar: mockedSidecarStatus,
   localModel: placeholderModelRegistry[0],
   modelRegistry: placeholderModelRegistry,
+  benchmark: {
+    status: "not_run",
+    latestResult: null,
+    message: "Benchmark has not run. Configure local runtime paths before benchmarking."
+  },
   lastError: null,
   network: "disabled",
   vault: "not_indexed",
@@ -61,6 +73,10 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
     } as T;
   }
 
+  if (command === "run_runtime_benchmark") {
+    throw new Error("Runtime benchmark requires the native Tauri app with validated local sidecar and model paths.");
+  }
+
   throw new Error(`Unknown Sprint 0 command: ${command}`);
 }
 
@@ -88,6 +104,15 @@ export async function sendLocalPrompt(prompt: string, mode: RuntimeMode, invoker
   return invoker<LocalPromptResponse>("send_local_prompt", {
     prompt: prompt.trim(),
     mode
+  });
+}
+
+export async function runRuntimeBenchmark(mode: RuntimeMode, invoker: TauriInvoker = defaultInvoker) {
+  return invoker<RuntimeBenchmarkResult>("run_runtime_benchmark", {
+    modelId: "qwen-0_8b-local",
+    mode,
+    maxTokens: 80,
+    timeoutMs: 60_000
   });
 }
 

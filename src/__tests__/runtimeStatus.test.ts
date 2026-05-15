@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  benchmarkStatusLabel,
   composeActionableMessage,
+  formatBenchmarkElapsed,
+  formatBenchmarkTokens,
   formatModelFile,
+  isBenchmarkRunnable,
   isLocalRuntimeReady,
+  latencyClassLabel,
   routeLabel,
   runtimeStateLabel
 } from "../services/runtimeStatus";
@@ -22,6 +27,11 @@ function status(overrides: Partial<RuntimeStatus> = {}): RuntimeStatus {
     sidecar: mockedSidecarStatus,
     localModel: placeholderModelRegistry[0],
     modelRegistry: placeholderModelRegistry,
+    benchmark: {
+      status: "not_run",
+      latestResult: null,
+      message: "Benchmark has not run."
+    },
     lastError: null,
     network: "disabled",
     vault: "not_indexed",
@@ -39,6 +49,7 @@ describe("runtime status presentation helpers", () => {
     expect(runtimeStateLabel(current.runtimeState)).toBe("Not Configured");
     expect(routeLabel(current.activeRoute)).toBe("Local Mock");
     expect(isLocalRuntimeReady(current)).toBe(false);
+    expect(isBenchmarkRunnable(current)).toBe(false);
   });
 
   it("detects ready local sidecar status", () => {
@@ -50,6 +61,38 @@ describe("runtime status presentation helpers", () => {
     expect(runtimeStateLabel(current.runtimeState)).toBe("Ready");
     expect(routeLabel(current.activeRoute)).toBe("Local Sidecar");
     expect(isLocalRuntimeReady(current)).toBe(true);
+    expect(isBenchmarkRunnable(current)).toBe(true);
+  });
+
+  it("labels benchmark states and formats latest benchmark result", () => {
+    const current = status({
+      runtimeState: "ready",
+      activeRoute: "local_sidecar",
+      benchmark: {
+        status: "passed",
+        message: "Benchmark passed.",
+        latestResult: {
+          benchmarkId: "benchmark:1:qwen-0_8b-local",
+          status: "passed",
+          modelId: "qwen-0_8b-local",
+          modelFileName: "qwen-test.gguf",
+          modelFileSizeMb: 512,
+          route: "local_sidecar",
+          mode: "fast",
+          elapsedMs: 11_000,
+          tokensPerSecondOptional: 4.2,
+          latencyClass: "acceptable",
+          passed: true,
+          reason: "Benchmark passed.",
+          createdAt: "unix:1"
+        }
+      }
+    });
+
+    expect(benchmarkStatusLabel(current.benchmark.status)).toBe("Passed");
+    expect(latencyClassLabel(current.benchmark.latestResult?.latencyClass ?? "unknown")).toBe("Acceptable");
+    expect(formatBenchmarkElapsed(current.benchmark.latestResult)).toBe("11000 ms");
+    expect(formatBenchmarkTokens(current.benchmark.latestResult)).toBe("4.2 token-ish/sec");
   });
 
   it("formats validated model filename and actionable errors", () => {
