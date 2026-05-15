@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { HealthCheck, LocalPromptResponse, RuntimeMode, RuntimeStatus } from "../types/runtime";
+import type { HealthCheck, LocalPromptResponse, RuntimeCommandError, RuntimeMode, RuntimeStatus } from "../types/runtime";
 
 type CommandArgs = Record<string, unknown>;
 export type TauriInvoker = <T>(command: string, args?: CommandArgs) => Promise<T>;
@@ -43,7 +43,11 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
 
     return {
       response: "Local inference is not connected yet. This is the Sprint 0 mocked response.",
+      modelId: null,
       mode,
+      route: "local_mock",
+      elapsedMs: 0,
+      finishReason: "mock_fallback",
       mocked: true
     } as T;
   }
@@ -76,4 +80,19 @@ export async function sendLocalPrompt(prompt: string, mode: RuntimeMode, invoker
     prompt: prompt.trim(),
     mode
   });
+}
+
+export function formatRuntimeError(error: unknown, fallback = "The local runtime command failed.") {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object") {
+    const runtimeError = error as RuntimeCommandError;
+    if (typeof runtimeError.message === "string") {
+      return runtimeError.userAction ? `${runtimeError.message} ${runtimeError.userAction}` : runtimeError.message;
+    }
+  }
+
+  return fallback;
 }

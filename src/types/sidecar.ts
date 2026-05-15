@@ -29,4 +29,5 @@ export type SidecarBinaryStatus = {
   message: string;
   recoverable: boolean;
   userAction: string;
+  lastCheckedAt: string | null;
 };

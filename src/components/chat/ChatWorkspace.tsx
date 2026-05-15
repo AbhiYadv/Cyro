@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
-import { sendLocalPrompt } from "../../services/tauriClient";
+import { formatRuntimeError, sendLocalPrompt } from "../../services/tauriClient";
 import type { ChatMessage } from "../../types/chat";
-import type { RuntimeMode } from "../../types/runtime";
+import type { RuntimeMode, RuntimeRoute } from "../../types/runtime";
 
 type ChatWorkspaceProps = {
   mode: RuntimeMode;
@@ -12,11 +12,20 @@ const initialMessages: ChatMessage[] = [
   {
     id: "welcome",
     role: "assistant",
-    body: "Cyro Local Brain is online in Sprint 0 shell mode. Runtime responses are mocked and local-only.",
+    body: "Cyro Local Brain is online. Configure a local sidecar to use a validated GGUF; otherwise responses use the mock fallback.",
     mode: "fast",
+    route: "local_mock",
     mocked: true
   }
 ];
+
+function routeLabel(route?: RuntimeRoute) {
+  if (route === "local_sidecar") {
+    return "Local Sidecar";
+  }
+
+  return "Local Mock";
+}
 
 export function ChatWorkspace({ mode, onModeChange }: ChatWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -60,12 +69,12 @@ export function ChatWorkspace({ mode, onModeChange }: ChatWorkspaceProps) {
           role: "assistant",
           body: result.response,
           mode: result.mode,
+          route: result.route,
           mocked: result.mocked
         }
       ]);
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : "The mocked Rust command failed.";
-      setError(message);
+      setError(formatRuntimeError(caughtError));
     } finally {
       setIsLoading(false);
     }
@@ -97,6 +106,7 @@ export function ChatWorkspace({ mode, onModeChange }: ChatWorkspaceProps) {
           <article className={`message-bubble ${message.role}`} key={message.id}>
             <span className="message-role">{message.role === "user" ? "You" : "Cyro"}</span>
             <p>{message.body}</p>
+            {message.role === "assistant" ? <span className="route-label">{routeLabel(message.route)}</span> : null}
             {message.mocked ? <span className="mock-label">Mocked</span> : null}
           </article>
         ))}

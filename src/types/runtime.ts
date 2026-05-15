@@ -1,4 +1,6 @@
 export type RuntimeMode = "fast" | "thinking";
+export type RuntimeRoute = "local_mock" | "local_sidecar";
+export type FinishReason = "completed" | "mock_fallback";
 
 export type RuntimeStatus = {
   health: "ok";
@@ -18,6 +20,18 @@ export type HealthCheck = {
 
 export type LocalPromptResponse = {
   response: string;
+  modelId: string | null;
   mode: RuntimeMode;
-  mocked: true;
+  route: RuntimeRoute;
+  elapsedMs: number;
+  finishReason: FinishReason;
+  mocked: boolean;
+};
+
+export type RuntimeCommandError = {
+  code?: string;
+  message?: string;
+  recoverable?: boolean;
+  userAction?: string;
+  debugDetailSafe?: string | null;
 };

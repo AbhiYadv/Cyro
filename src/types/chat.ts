@@ -1,4 +1,4 @@
-import type { RuntimeMode } from "./runtime";
+import type { RuntimeMode, RuntimeRoute } from "./runtime";
 
 export type ChatRole = "user" | "assistant";
 
@@ -7,5 +7,6 @@ export type ChatMessage = {
   role: ChatRole;
   body: string;
   mode?: RuntimeMode;
+  route?: RuntimeRoute;
   mocked?: boolean;
 };

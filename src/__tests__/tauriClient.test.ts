@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getRuntimeStatus, isPromptValid, sendLocalPrompt, type TauriInvoker } from "../services/tauriClient";
+import { formatRuntimeError, getRuntimeStatus, isPromptValid, sendLocalPrompt, type TauriInvoker } from "../services/tauriClient";
 
 describe("tauriClient Sprint 0 contract", () => {
   it("rejects empty prompts before invoking Tauri", async () => {
@@ -31,12 +31,26 @@ describe("tauriClient Sprint 0 contract", () => {
 
     expect(response).toEqual({
       response: "Local inference is not connected yet. This is the Sprint 0 mocked response.",
+      modelId: null,
       mode: "thinking",
+      route: "local_mock",
+      elapsedMs: 0,
+      finishReason: "mock_fallback",
       mocked: true
     });
   });
 
   it("surfaces mocked command failures", async () => {
     await expect(sendLocalPrompt("/fail", "fast")).rejects.toThrow("Sprint 0 mocked command failure.");
+  });
+
+  it("formats structured runtime errors", () => {
+    expect(
+      formatRuntimeError({
+        code: "sidecar_timeout",
+        message: "The local llama.cpp sidecar timed out.",
+        userAction: "Try a shorter prompt."
+      })
+    ).toBe("The local llama.cpp sidecar timed out. Try a shorter prompt.");
   });
 });

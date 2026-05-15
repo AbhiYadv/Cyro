@@ -1,0 +1,364 @@
+use std::{
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
+};
+
+use crate::runtime_types::{FinishReason, RuntimeError};
+
+const DEFAULT_PROMPT_TIMEOUT_SECS: u64 = 60;
+const MAX_DEBUG_CHARS: usize = 1_200;
+const LLAMA_CLI_FIXED_ARGS: [&str; 5] = [
+    "--single-turn",
+    "--no-display-prompt",
+    "--no-show-timings",
+    "--simple-io",
+    "--offline",
+];
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LlamaCliRequest {
+    pub binary_path: String,
+    pub model_path: String,
+    pub prompt: String,
+    pub max_tokens: u32,
+    pub timeout: Duration,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LlamaCliOutput {
+    pub response: String,
+    pub elapsed_ms: u64,
+    pub finish_reason: FinishReason,
+}
+
+impl LlamaCliRequest {
+    pub fn new(binary_path: String, model_path: String, prompt: String, max_tokens: u32) -> Self {
+        Self {
+            binary_path,
+            model_path,
+            prompt,
+            max_tokens,
+            timeout: Duration::from_secs(DEFAULT_PROMPT_TIMEOUT_SECS),
+        }
+    }
+}
+
+pub fn sanitize_max_tokens(max_tokens: Option<u32>) -> u32 {
+    max_tokens.unwrap_or(120).clamp(1, 256)
+}
+
+pub fn build_llama_cli_args(model_path: &str, prompt: &str, max_tokens: u32) -> Vec<String> {
+    let mut args = vec![
+        "-m".to_string(),
+        model_path.to_string(),
+        "-p".to_string(),
+        prompt.to_string(),
+        "-n".to_string(),
+        max_tokens.to_string(),
+    ];
+
+    args.extend(LLAMA_CLI_FIXED_ARGS.iter().map(|arg| arg.to_string()));
+    args
+}
+
+pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput, RuntimeError> {
+    let started_at = Instant::now();
+    let args = build_llama_cli_args(&request.model_path, &request.prompt, request.max_tokens);
+
+    let mut child = Command::new(&request.binary_path)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            RuntimeError::recoverable(
+                "sidecar_spawn_failed",
+                "Cyro could not start the local llama.cpp sidecar.",
+                "Check that the configured llama-cli path still exists and is executable.",
+                Some(error.to_string()),
+            )
+        })?;
+
+    loop {
+        if child.try_wait().map_err(runtime_wait_error)?.is_some() {
+            let output = child.wait_with_output().map_err(runtime_wait_error)?;
+            let elapsed_ms = elapsed_ms(started_at);
+
+            if !output.status.success() {
+                return Err(RuntimeError::recoverable(
+                    "sidecar_exit_failed",
+                    "The local llama.cpp sidecar exited with an error.",
+                    "Check the configured model path and try a shorter local prompt.",
+                    Some(format!(
+                        "exit={}; stderr={}",
+                        output.status,
+                        sanitize_debug_output(
+                            &String::from_utf8_lossy(&output.stderr),
+                            &request.prompt
+                        )
+                    )),
+                ));
+            }
+
+            let response =
+                cleanup_stdout(&String::from_utf8_lossy(&output.stdout), &request.prompt);
+            if response.is_empty() {
+                return Err(RuntimeError::recoverable(
+                    "sidecar_empty_response",
+                    "The local llama.cpp sidecar returned no text.",
+                    "Try a shorter prompt or a different validated GGUF model.",
+                    Some(sanitize_debug_output(
+                        &String::from_utf8_lossy(&output.stderr),
+                        &request.prompt,
+                    )),
+                ));
+            }
+
+            return Ok(LlamaCliOutput {
+                response,
+                elapsed_ms,
+                finish_reason: FinishReason::Completed,
+            });
+        }
+
+        if started_at.elapsed() >= request.timeout {
+            let _ = child.kill();
+            let _ = child.wait();
+
+            return Err(RuntimeError::recoverable(
+                "sidecar_timeout",
+                "The local llama.cpp sidecar timed out.",
+                "Try a shorter prompt or lower token limit.",
+                Some(format!("timeoutMs={}", request.timeout.as_millis())),
+            ));
+        }
+
+        thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn runtime_wait_error(error: std::io::Error) -> RuntimeError {
+    RuntimeError::recoverable(
+        "sidecar_wait_failed",
+        "Cyro could not read the local sidecar process result.",
+        "Retry the prompt after confirming the sidecar path is valid.",
+        Some(error.to_string()),
+    )
+}
+
+fn cleanup_stdout(stdout: &str, prompt: &str) -> String {
+    let mut cleaned = stdout.replace("\r\n", "\n").trim().to_string();
+    let prompt = prompt.trim();
+
+    if !prompt.is_empty() {
+        if let Some(prompt_start) = cleaned.find(prompt) {
+            cleaned = cleaned[prompt_start + prompt.len()..].trim().to_string();
+        }
+    }
+
+    cleaned
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed == "Exiting..." || trimmed.starts_with('>') {
+                None
+            } else {
+                Some(trimmed)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
+fn sanitize_debug_output(output: &str, prompt: &str) -> String {
+    let redacted = if prompt.trim().is_empty() {
+        output.to_string()
+    } else {
+        output.replace(prompt.trim(), "[prompt redacted]")
+    };
+
+    redacted.chars().take(MAX_DEBUG_CHARS).collect()
+}
+
+fn elapsed_ms(started_at: Instant) -> u64 {
+    u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_llama_cli_args, run_llama_cli_prompt, sanitize_max_tokens, LlamaCliRequest};
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+        time::{Duration, SystemTime, UNIX_EPOCH},
+    };
+
+    #[test]
+    fn builds_structured_llama_cli_args_without_shell_string() {
+        let args = build_llama_cli_args("/models/qwen.gguf", "hello; rm -rf /", 120);
+
+        assert_eq!(
+            args,
+            vec![
+                "-m",
+                "/models/qwen.gguf",
+                "-p",
+                "hello; rm -rf /",
+                "-n",
+                "120",
+                "--single-turn",
+                "--no-display-prompt",
+                "--no-show-timings",
+                "--simple-io",
+                "--offline"
+            ]
+        );
+    }
+
+    #[test]
+    fn cleanup_stdout_removes_llama_banner_prompt_and_exit_text() {
+        let stdout = r#"
+Loading model...
+
+build      : b9162-d52844458
+model      : qwen2.5-0.5b-instruct-q4_k_m.gguf
+
+available commands:
+  /exit or Ctrl+C     stop or exit
+
+> Answer in 1 sentence: what is PostgreSQL PITR?
+
+PostgreSQL PITR restores a database to a chosen point in time using base backups and WAL archives.
+
+Exiting...
+"#;
+
+        let cleaned =
+            super::cleanup_stdout(stdout, "Answer in 1 sentence: what is PostgreSQL PITR?");
+
+        assert_eq!(
+            cleaned,
+            "PostgreSQL PITR restores a database to a chosen point in time using base backups and WAL archives."
+        );
+    }
+
+    #[test]
+    fn max_tokens_are_conservative_and_bounded() {
+        assert_eq!(sanitize_max_tokens(None), 120);
+        assert_eq!(sanitize_max_tokens(Some(0)), 1);
+        assert_eq!(sanitize_max_tokens(Some(999)), 256);
+    }
+
+    #[test]
+    fn nonzero_exit_returns_actionable_runtime_error() {
+        let sandbox = TestSandbox::new("nonzero");
+        let binary = sandbox.write_executable("llama-cli", "#!/bin/sh\necho failed >&2\nexit 7\n");
+        let request = LlamaCliRequest {
+            binary_path: path_str(&binary).to_string(),
+            model_path: "/tmp/model.gguf".to_string(),
+            prompt: "private prompt".to_string(),
+            max_tokens: 8,
+            timeout: Duration::from_secs(2),
+        };
+
+        let error = run_llama_cli_prompt(&request).expect_err("nonzero script should fail");
+
+        assert_eq!(error.code, "sidecar_exit_failed");
+        assert!(error.recoverable);
+        assert!(!error
+            .debug_detail_safe
+            .as_deref()
+            .unwrap_or_default()
+            .contains("private prompt"));
+    }
+
+    #[test]
+    fn timeout_kills_process_and_returns_runtime_error() {
+        let sandbox = TestSandbox::new("timeout");
+        let binary = sandbox.write_executable("llama-cli", "#!/bin/sh\nsleep 2\necho late\n");
+        let request = LlamaCliRequest {
+            binary_path: path_str(&binary).to_string(),
+            model_path: "/tmp/model.gguf".to_string(),
+            prompt: "hello".to_string(),
+            max_tokens: 8,
+            timeout: Duration::from_millis(25),
+        };
+
+        let error = run_llama_cli_prompt(&request).expect_err("sleeping script should time out");
+
+        assert_eq!(error.code, "sidecar_timeout");
+        assert!(error.user_action.contains("shorter prompt"));
+    }
+
+    #[test]
+    #[ignore]
+    fn manual_llama_cli_prompt_from_env() {
+        let binary_path = std::env::var("CYRO_TEST_LLAMA_CLI_PATH")
+            .expect("CYRO_TEST_LLAMA_CLI_PATH must point to llama-cli");
+        let model_path =
+            std::env::var("CYRO_TEST_MODEL_PATH").expect("CYRO_TEST_MODEL_PATH must point to GGUF");
+        let request = LlamaCliRequest::new(
+            binary_path,
+            model_path,
+            "Answer in 3 bullets: what is PostgreSQL PITR?".to_string(),
+            64,
+        );
+
+        let output = run_llama_cli_prompt(&request).expect("manual sidecar prompt should run");
+
+        assert!(!output.response.trim().is_empty());
+    }
+
+    struct TestSandbox {
+        root: PathBuf,
+    }
+
+    impl TestSandbox {
+        fn new(label: &str) -> Self {
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be valid")
+                .as_nanos();
+            let root = std::env::temp_dir().join(format!(
+                "cyro-llama-cli-{label}-{}-{nanos}",
+                std::process::id()
+            ));
+            fs::create_dir_all(&root).expect("test sandbox should be created");
+
+            Self { root }
+        }
+
+        fn write_executable(&self, name: &str, content: &str) -> PathBuf {
+            let path = self.root.join(name);
+            fs::write(&path, content).expect("test executable should be written");
+            make_executable(&path);
+            path
+        }
+    }
+
+    impl Drop for TestSandbox {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[cfg(unix)]
+    fn make_executable(path: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(path)
+            .expect("test executable metadata should exist")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).expect("test executable should be executable");
+    }
+
+    #[cfg(not(unix))]
+    fn make_executable(_path: &Path) {}
+
+    fn path_str(path: &Path) -> &str {
+        path.to_str().expect("test path should be utf8")
+    }
+}

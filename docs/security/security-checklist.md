@@ -62,6 +62,18 @@
 - [ ] No sidecar or model binaries are committed
 - [ ] No auto-download is added without an explicit packaging task
 
+## Sidecar Prompt Execution
+- [ ] Rust launches `llama-cli` with structured `Command` args only
+- [ ] No shell command string, `shell=true`, or command concatenation is used
+- [ ] Frontend does not pass arbitrary sidecar args
+- [ ] `llama-cli` runs with fixed internal non-interactive/offline flags, not user-provided args
+- [ ] Prompt content is not logged by default
+- [ ] Sidecar prompt execution has a timeout
+- [ ] Timeout kills or reaps the child process
+- [ ] Nonzero exit returns an actionable runtime error
+- [ ] Stderr/debug output is bounded and prompt-redacted before surfacing
+- [ ] Streaming and cancellation UX remain future work
+
 ## Model Path Validation
 - [ ] Rust/Tauri validates all model filesystem paths
 - [ ] Frontend does not validate filesystem paths directly

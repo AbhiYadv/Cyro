@@ -311,6 +311,8 @@ Command contracts:
 - `validate_model_path`
 - `get_model_registry`
 - `set_model_path`
+- `validate_sidecar_path`
+- `set_sidecar_path`
 - `load_local_model`
 - `unload_local_model`
 - `send_local_prompt`
@@ -321,6 +323,38 @@ Command authority:
 - React invokes commands.
 - Rust validates inputs and owns runtime authority.
 - Sidecar receives only validated local runtime work from Rust.
+
+## CYRO-0007 First Non-Streaming Prompt Path
+
+CYRO-0007 introduces the first optional real local GGUF prompt path through a Rust-supervised `llama-cli` process.
+
+Behavior:
+- if no sidecar path and no model path are configured, `send_local_prompt` keeps the `local_mock` fallback
+- if a sidecar path is configured, Rust validates that it is a local executable `llama-cli`
+- if a model path is configured, Rust validates that it is a readable local `.gguf` file
+- when both paths are valid, Rust launches `llama-cli` with structured process arguments
+- React never executes the binary, builds command strings, or owns runtime authority
+- prompt content is not logged by default
+
+CYRO-0007 process arguments:
+- `-m <model_path>`
+- `-p <prompt>`
+- `-n <max_tokens>`
+
+CYRO-0007 also adds fixed internal safety flags for the local `llama-cli` subprocess:
+- `--single-turn`
+- `--no-display-prompt`
+- `--no-show-timings`
+- `--simple-io`
+- `--offline`
+
+These flags are not user-controlled. They keep the first prompt path bounded, prevent the interactive console loop, reduce prompt echo in output, improve subprocess compatibility, and block `llama-cli` network/cache download behavior.
+
+The first proof uses conservative max tokens with a default of `120` and an upper bound of `256`. The command has a timeout and returns actionable `RuntimeError` values for missing sidecar, invalid model, timeout, nonzero exit, empty response, or process wait failure.
+
+Streaming is still future work. `llama-server`, token streaming, cancellation UX, partial output, richer runtime status, and model lifecycle controls remain CYRO-0008 or later.
+
+The provided tiny `0.5B` GGUF test model is a runtime proof only. Output quality from that test model is not representative of final Local Brain answer quality.
 
 ## LocalModelConfig
 

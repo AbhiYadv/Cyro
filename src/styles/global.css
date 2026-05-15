@@ -37,6 +37,7 @@ body {
 }
 
 button,
+input,
 textarea {
   font: inherit;
 }
@@ -46,6 +47,7 @@ button {
 }
 
 button:disabled,
+input:disabled,
 textarea:disabled {
   cursor: not-allowed;
   opacity: 0.62;
@@ -279,7 +281,8 @@ textarea:disabled {
 }
 
 .message-role,
-.mock-label {
+.mock-label,
+.route-label {
   display: inline-block;
   color: var(--cyan);
   font-size: 0.72rem;
@@ -296,6 +299,10 @@ textarea:disabled {
 .mock-label {
   margin-top: 0.65rem;
   color: var(--amber);
+}
+
+.route-label {
+  margin-top: 0.65rem;
 }
 
 .error-banner {
@@ -381,6 +388,55 @@ textarea:disabled {
 .runtime-row strong {
   color: var(--text);
   text-align: right;
+}
+
+.runtime-config {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  padding: 0.8rem;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.runtime-config input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.7rem;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  outline: none;
+}
+
+.runtime-config input:focus {
+  border-color: rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+
+.runtime-config button {
+  min-height: 2.6rem;
+  border: 1px solid rgba(52, 211, 153, 0.42);
+  border-radius: 0.5rem;
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.config-status,
+.config-error {
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.config-status {
+  color: var(--emerald);
+}
+
+.config-error {
+  color: #fecdd3;
 }
 
 .privacy-callout {
