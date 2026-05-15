@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+mod model_registry;
 mod sidecar;
 
 #[derive(Serialize)]
@@ -77,9 +78,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             health_check,
             get_runtime_status,
+            model_registry::get_model_registry,
+            model_registry::set_model_path,
+            model_registry::validate_model_path,
             sidecar::get_sidecar_status,
             send_local_prompt
         ])
+        .manage(model_registry::ModelRegistryState::default())
         .run(tauri::generate_context!())
         .expect("failed to run Cyro Sprint 0 desktop shell");
 }

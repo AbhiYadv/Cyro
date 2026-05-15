@@ -8,8 +8,8 @@
 | CYRO-PROVIDER-001 | Embedded Provider Session ADR and Chat-First UX Contract | task/CYRO-PROVIDER-001-embedded-session-adr | Ready for Review |  | 2026-05-15 | ADR/security/session-container docs only; separates current external fallback from future embedded session |
 | CYRO-0003 | Runtime Intelligence Layer for Local Brain Phase | task/CYRO-0003-runtime-intelligence-layer | Ready for Review |  | 2026-05-15 | Architecture/contracts only; no llama.cpp, PGLite, sync, mDNS, VPN, provider APIs, or product code |
 | CYRO-0004 | llama.cpp Sidecar ADR and Local Brain Runtime Contract | task/CYRO-0004-llama-sidecar-adr | Merged to dev | 10/10 | 2026-05-15 | Architecture/contracts only; no binaries, model files, downloads, FFI, Python, cloud fallback, or product code |
-| CYRO-0005 | Sidecar Binary Discovery and Build Plan | task/CYRO-0005-sidecar-discovery-strategy | Ready for Review |  | 2026-05-15 | Defines discovery/status strategy and mocked `get_sidecar_status`; no binary execution or inference |
-| CYRO-0006 | Model Path Validation and Registry Placeholder | Phase 1 | Planned |  |  | Rust validates user-provided GGUF path, metadata, size, and safe error behavior |
+| CYRO-0005 | Sidecar Binary Discovery and Build Plan | task/CYRO-0005-sidecar-discovery-strategy | Merged to dev | 10/10 | 2026-05-15 | Defines discovery/status strategy and mocked `get_sidecar_status`; no binary execution or inference |
+| CYRO-0006 | Model Path Validation and Registry Placeholder | task/CYRO-0006-model-path-validation | Ready for Review |  | 2026-05-15 | Rust validates local `.gguf` path, exposes placeholder registry, and adds no model loading, inference, downloads, or binaries |
 | CYRO-0007 | First Local Inference Command | Phase 1 | Planned |  |  | Implements first `send_local_prompt` sidecar command after sidecar and model validation |
 | CYRO-0008 | Streaming and Cancel Contract | Phase 1B | Planned |  |  | Defines token streaming, cancellation, partial output, and process kill strategy |
 | CYRO-0009 | Runtime Benchmark Gate | Phase 1 | Planned |  |  | Records local benchmark evidence before selecting benchmark-gated models |
