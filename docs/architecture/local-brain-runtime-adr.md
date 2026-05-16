@@ -352,7 +352,7 @@ These flags are not user-controlled. They keep the first prompt path bounded, pr
 
 The first proof uses conservative max tokens with a default of `120` and an upper bound of `256`. The command has a timeout and returns actionable `RuntimeError` values for missing sidecar, invalid model, timeout, nonzero exit, empty response, or process wait failure.
 
-Streaming is still future work. `llama-server`, token streaming, cancellation UX, partial output, richer process lifecycle state, and model lifecycle controls remain CYRO-0010 or later.
+Streaming is still future work. `llama-server`, token streaming, cancellation UX, partial output, richer process lifecycle state, and model lifecycle controls remain CYRO-0011 or later.
 
 The provided tiny `0.5B` GGUF test model is a runtime proof only. Output quality from that test model is not representative of final Local Brain answer quality.
 
@@ -460,6 +460,34 @@ Runtime Governor relationship:
 - `recoverable`
 - `userAction`
 - `debugDetailSafe`
+
+## CYRO-0010 Local Model Candidate Evaluation
+
+CYRO-0010 defines the local model candidate evaluation matrix. It does not download models, commit model files, switch runtime models automatically, add benchmark persistence, add cloud evaluation, or introduce LLM judge scoring.
+
+The current 0.5B GGUF proof model is not the final default local brain. It is classified as `pipeline_only` because it proved the Rust-supervised sidecar path and benchmark plumbing, but failed technical answer quality on PostgreSQL PITR.
+
+Model selection principle:
+- do not select a default local brain based only on speed
+- benchmark evidence is required for runtime suitability
+- quality evidence is required for route suitability
+- Fast/Think/Pro require benchmark and quality evidence before a candidate can become default
+
+Candidate ladder:
+- `0.5B`: pipeline proof only, route `none`
+- `0.8B or nearest small Qwen instruct GGUF`: Fast candidate to evaluate
+- `1.5B Q4/IQ`: Think candidate for capable phone/laptop
+- `3B Q4/IQ`: future laptop/Pro candidate, benchmark-gated later
+
+Quantization policy:
+- `Q4_K_M` remains the first baseline for quality/speed comparisons
+- `IQ4` and `IQ3` are advanced compression candidates after baseline comparison
+- `Q2` and `IQ2` are utility/router/redaction/emergency fallback candidates only, not main answer models
+- `Q5` and `Q8` are laptop-quality candidates only if benchmark and resource gates pass
+
+Evaluation records must include latency, token estimate, cold start observation, manual memory observation, technical accuracy score, instruction following score, crispness score, recommended route, decision, and notes.
+
+CYRO-0011 or a follow-up may test larger models manually using user-provided local GGUF paths. Those tests must not add model downloads, model files, model marketplace UX, or automatic model switching.
 
 ## LocalModelConfig
 
@@ -598,3 +626,4 @@ Recommended sequence:
 6. Local model candidate evaluation.
 7. Streaming and cancellation contract.
 8. Crisp answer protocol.
+9. Context Capsule Builder ADR.

@@ -96,16 +96,20 @@ Requirements:
 - runtime errors are visible and actionable
 - Runtime Intelligence decides whether the sidecar route is available
 - benchmark gates are required before selecting benchmark-gated models
+- model quality gates are required before selecting a default local answer model
+- local model selection requires both benchmark evidence and answer-quality evidence
 
 The current Sprint 0 shell is a demo baseline, not the final Local Brain UX. The Local Brain UX will be redesigned in later implementation tasks.
 
+The current tiny 0.5B GGUF proof model is pipeline proof only. It validates local path, sidecar, and benchmark plumbing, but it must not be presented as production-grade local technical answer quality. Cyro must not claim production-grade local technical answers from the 0.5B proof model.
+
 ## Runtime Intelligence Layer
 
-The Runtime Intelligence Layer prepares the Local Brain phase. It decides model, quantization, route, and future offload policy from device resources, benchmark evidence, installed models, user settings, battery, thermal state, and trusted future laptop/node availability.
+The Runtime Intelligence Layer prepares the Local Brain phase. It decides model, quantization, route, and future offload policy from device resources, benchmark evidence, quality evidence, installed models, user settings, battery, thermal state, and trusted future laptop/node availability.
 
 Fast, Think, and Pro are routing modes, not hardcoded model names. Local 0.8B remains the always-available fallback. Cyro must not assume every device can run 3B or larger models.
 
-Runtime decisions must be explainable to the user. The product must be able to show why Cyro selected Local 0.8B, downgraded quantization, blocked a larger model, deferred work, or required approval for future offload.
+Runtime decisions must be explainable to the user. The product must be able to show why Cyro selected Local 0.8B, downgraded quantization, blocked a larger model, blocked a fast-but-low-quality model, deferred work, or required approval for future offload.
 
 Laptop offload is a future trusted route. It requires explicit trusted device pairing, visible route explanation, and user approval when prompt privacy impact changes. Same-Wi-Fi discovery and offload transport are not part of this phase.
 
