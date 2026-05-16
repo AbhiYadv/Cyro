@@ -66,7 +66,10 @@
 - [ ] Rust launches `llama-cli` with structured `Command` args only
 - [ ] No shell command string, `shell=true`, or command concatenation is used
 - [ ] Frontend does not pass arbitrary sidecar args
-- [ ] `llama-cli` runs with fixed internal non-interactive/offline flags, not user-provided args
+- [ ] `llama-cli` runs in one-shot `-m <model> -p <prompt> -n <maxTokens> --single-turn` mode, not interactive REPL mode
+- [ ] Rust sets child `current_dir` to the validated sidecar binary parent directory before launch
+- [ ] Rust passes structured args and closes child stdin; it does not use shell strings or user-provided sidecar flags
+- [ ] `CYRO_LLAMA_CLI_CPU_FALLBACK=1` may append `--device none` only for development/manual validation when Metal fails under the native launch context; it is not a product default
 - [ ] Prompt content is not logged by default
 - [ ] Sidecar prompt execution has a timeout
 - [ ] Timeout kills or reaps the child process

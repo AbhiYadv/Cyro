@@ -13,8 +13,8 @@ use serde::Serialize;
 
 use crate::{
     llama_cli::{
-        build_llama_cli_args, cleanup_stdout, sanitize_debug_output, LlamaCliRequest,
-        MAX_DEBUG_CHARS,
+        build_llama_cli_args_for_request, cleanup_stdout, llama_cli_working_dir,
+        sanitize_debug_output, LlamaCliRequest, MAX_DEBUG_CHARS,
     },
     runtime_types::{FinishReason, GenerationState, RuntimeError, RuntimeMode, RuntimeRoute},
 };
@@ -266,10 +266,17 @@ where
 {
     let generation_id = new_generation_id();
     let started_at = Instant::now();
-    let args = build_llama_cli_args(&request.model_path, &request.prompt, request.max_tokens);
+    let args = build_llama_cli_args_for_request(request);
+    let working_dir = llama_cli_working_dir(&request.binary_path);
 
-    let mut child = Command::new(&request.binary_path)
+    let mut command = Command::new(&request.binary_path);
+    if let Some(working_dir) = working_dir {
+        command.current_dir(working_dir);
+    }
+
+    let mut child = command
         .args(args)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -1013,6 +1020,7 @@ mod tests {
             prompt: prompt.to_string(),
             max_tokens: 24,
             timeout,
+            cpu_fallback: false,
         }
     }
 

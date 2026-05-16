@@ -336,23 +336,19 @@ Behavior:
 - React never executes the binary, builds command strings, or owns runtime authority
 - prompt content is not logged by default
 
-CYRO-0007 process arguments:
+CYRO-0007 and CYRO-0011B process arguments:
 - `-m <model_path>`
 - `-p <prompt>`
 - `-n <max_tokens>`
-
-CYRO-0007 also adds fixed internal safety flags for the local `llama-cli` subprocess:
 - `--single-turn`
-- `--no-display-prompt`
-- `--no-show-timings`
-- `--simple-io`
-- `--offline`
 
-These flags are not user-controlled. They keep the first prompt path bounded, prevent the interactive console loop, reduce prompt echo in output, improve subprocess compatibility, and block `llama-cli` network/cache download behavior.
+CYRO-0011B clarified the launch mode after native validation: Cyro uses one-shot `llama-cli` prompt semantics rather than interactive REPL mode. `llama-cli` auto-enables conversation mode for chat-template models, so Cyro adds the minimal documented `--single-turn` flag to make a predefined `-p` prompt exit after one response. Rust still constructs the arguments as a structured array, never a shell command string, sets the child working directory to the sidecar binary parent directory, and closes stdin for the child process.
+
+If Metal initialization fails only under the native/Tauri launch context, developers may launch Cyro with `CYRO_LLAMA_CLI_CPU_FALLBACK=1`. That appends `--device none` to the structured Rust-owned arguments for local manual validation only. CPU fallback is not the product default and React cannot provide arbitrary sidecar flags.
 
 The first proof uses conservative max tokens with a default of `120` and an upper bound of `256`. The command has a timeout and returns actionable `RuntimeError` values for missing sidecar, invalid model, timeout, nonzero exit, empty response, or process wait failure.
 
-Streaming is still future work. `llama-server`, token streaming, cancellation UX, partial output, richer process lifecycle state, and model lifecycle controls remain CYRO-0011 or later.
+`llama-server`, richer model lifecycle controls, queueing, and product-grade model management remain later work.
 
 The provided tiny `0.5B` GGUF test model is a runtime proof only. Output quality from that test model is not representative of final Local Brain answer quality.
 
@@ -664,7 +660,9 @@ Implemented stream event names:
 
 Streaming behavior:
 - Rust validates the configured `llama-cli` path and `.gguf` model path before starting a stream.
-- Rust spawns `llama-cli` with structured `Command` args only.
+- Rust spawns `llama-cli` with structured one-shot `-m <model> -p <prompt> -n <maxTokens> --single-turn` args.
+- Rust sets the child working directory to the validated sidecar binary parent and closes stdin.
+- If `CYRO_LLAMA_CLI_CPU_FALLBACK=1` is set for development validation, Rust appends `--device none`; this is not a product default.
 - Rust reads stdout incrementally and emits ordered `delta` events.
 - React subscribes to stream events and appends deltas to the active assistant message.
 - The final result replaces the partial message with cleaned stdout.

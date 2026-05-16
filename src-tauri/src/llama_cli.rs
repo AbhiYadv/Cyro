@@ -1,4 +1,5 @@
 use std::{
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
@@ -8,13 +9,7 @@ use crate::runtime_types::{FinishReason, RuntimeError};
 
 const DEFAULT_PROMPT_TIMEOUT_SECS: u64 = 60;
 pub(crate) const MAX_DEBUG_CHARS: usize = 1_200;
-const LLAMA_CLI_FIXED_ARGS: [&str; 5] = [
-    "--single-turn",
-    "--no-display-prompt",
-    "--no-show-timings",
-    "--simple-io",
-    "--offline",
-];
+const LLAMA_CLI_ONE_SHOT_ARGS: [&str; 1] = ["--single-turn"];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LlamaCliRequest {
@@ -23,6 +18,7 @@ pub struct LlamaCliRequest {
     pub prompt: String,
     pub max_tokens: u32,
     pub timeout: Duration,
+    pub cpu_fallback: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,6 +36,7 @@ impl LlamaCliRequest {
             prompt,
             max_tokens,
             timeout: Duration::from_secs(DEFAULT_PROMPT_TIMEOUT_SECS),
+            cpu_fallback: dev_cpu_fallback_enabled(),
         }
     }
 }
@@ -58,16 +55,35 @@ pub fn build_llama_cli_args(model_path: &str, prompt: &str, max_tokens: u32) -> 
         max_tokens.to_string(),
     ];
 
-    args.extend(LLAMA_CLI_FIXED_ARGS.iter().map(|arg| arg.to_string()));
+    args.extend(LLAMA_CLI_ONE_SHOT_ARGS.iter().map(|arg| arg.to_string()));
     args
+}
+
+pub fn build_llama_cli_args_for_request(request: &LlamaCliRequest) -> Vec<String> {
+    let mut args = build_llama_cli_args(&request.model_path, &request.prompt, request.max_tokens);
+    if request.cpu_fallback {
+        args.extend(["--device".to_string(), "none".to_string()]);
+    }
+    args
+}
+
+pub(crate) fn llama_cli_working_dir(binary_path: &str) -> Option<PathBuf> {
+    Path::new(binary_path).parent().map(Path::to_path_buf)
 }
 
 pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput, RuntimeError> {
     let started_at = Instant::now();
-    let args = build_llama_cli_args(&request.model_path, &request.prompt, request.max_tokens);
+    let args = build_llama_cli_args_for_request(request);
+    let working_dir = llama_cli_working_dir(&request.binary_path);
 
-    let mut child = Command::new(&request.binary_path)
+    let mut command = Command::new(&request.binary_path);
+    if let Some(working_dir) = working_dir {
+        command.current_dir(working_dir);
+    }
+
+    let mut child = command
         .args(args)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -187,9 +203,23 @@ fn elapsed_ms(started_at: Instant) -> u64 {
     u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
+pub(crate) fn dev_cpu_fallback_enabled() -> bool {
+    matches!(
+        std::env::var("CYRO_LLAMA_CLI_CPU_FALLBACK")
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "cpu" | "none"
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{build_llama_cli_args, run_llama_cli_prompt, sanitize_max_tokens, LlamaCliRequest};
+    use super::{
+        build_llama_cli_args, build_llama_cli_args_for_request, llama_cli_working_dir,
+        run_llama_cli_prompt, sanitize_max_tokens, LlamaCliRequest,
+    };
     use std::{
         fs,
         path::{Path, PathBuf},
@@ -209,11 +239,42 @@ mod tests {
                 "hello; rm -rf /",
                 "-n",
                 "120",
+                "--single-turn"
+            ]
+        );
+    }
+
+    #[test]
+    fn derives_llama_cli_working_dir_from_binary_parent() {
+        let working_dir = llama_cli_working_dir("/tools/llama.cpp/build/bin/llama-cli")
+            .expect("absolute binary path should have a parent");
+
+        assert_eq!(working_dir, PathBuf::from("/tools/llama.cpp/build/bin"));
+    }
+
+    #[test]
+    fn cpu_fallback_adds_explicit_device_none_without_shell_args() {
+        let request = LlamaCliRequest {
+            binary_path: "/tools/llama-cli".to_string(),
+            model_path: "/models/qwen.gguf".to_string(),
+            prompt: "hello".to_string(),
+            max_tokens: 24,
+            timeout: Duration::from_secs(2),
+            cpu_fallback: true,
+        };
+
+        assert_eq!(
+            build_llama_cli_args_for_request(&request),
+            vec![
+                "-m",
+                "/models/qwen.gguf",
+                "-p",
+                "hello",
+                "-n",
+                "24",
                 "--single-turn",
-                "--no-display-prompt",
-                "--no-show-timings",
-                "--simple-io",
-                "--offline"
+                "--device",
+                "none"
             ]
         );
     }
@@ -262,6 +323,7 @@ Exiting...
             prompt: "private prompt".to_string(),
             max_tokens: 8,
             timeout: Duration::from_secs(2),
+            cpu_fallback: false,
         };
 
         let error = run_llama_cli_prompt(&request).expect_err("nonzero script should fail");
@@ -285,6 +347,7 @@ Exiting...
             prompt: "hello".to_string(),
             max_tokens: 8,
             timeout: Duration::from_millis(25),
+            cpu_fallback: false,
         };
 
         let error = run_llama_cli_prompt(&request).expect_err("sleeping script should time out");

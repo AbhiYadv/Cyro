@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::llama_cli::{run_llama_cli_prompt, LlamaCliRequest};
+use crate::llama_cli::{dev_cpu_fallback_enabled, run_llama_cli_prompt, LlamaCliRequest};
 use crate::model_registry::{
     validate_model_path_value, ModelRegistryEntry, ModelRegistryState, PLACEHOLDER_MODEL_ID,
 };
@@ -249,6 +249,7 @@ fn build_benchmark_llama_cli_request(
         prompt: BENCHMARK_PROMPT.to_string(),
         max_tokens: sanitize_benchmark_max_tokens(request.max_tokens),
         timeout: Duration::from_millis(sanitize_benchmark_timeout_ms(request.timeout_ms)),
+        cpu_fallback: dev_cpu_fallback_enabled(),
     }
 }
 
