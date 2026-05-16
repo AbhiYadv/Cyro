@@ -1,17 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { placeholderModelRegistry } from "./modelRegistry";
 import { mockedSidecarStatus } from "./sidecar";
 import type {
+  CancelGenerationResponse,
   HealthCheck,
+  LocalPromptStreamEvent,
   LocalPromptResponse,
   RuntimeBenchmarkResult,
   RuntimeCommandError,
   RuntimeMode,
-  RuntimeStatus
+  RuntimeStatus,
+  StreamingPromptResult
 } from "../types/runtime";
 
 type CommandArgs = Record<string, unknown>;
 export type TauriInvoker = <T>(command: string, args?: CommandArgs) => Promise<T>;
+export type StreamEventSubscriber = (handler: (event: LocalPromptStreamEvent) => void) => Promise<UnlistenFn>;
+export const LOCAL_PROMPT_STREAM_EVENT = "cyro://local-prompt-stream";
 
 const mockedRuntimeStatus: RuntimeStatus = {
   health: "ok",
@@ -29,6 +35,9 @@ const mockedRuntimeStatus: RuntimeStatus = {
     latestResult: null,
     message: "Benchmark has not run. Configure local runtime paths before benchmarking."
   },
+  generationState: "idle",
+  activeGenerationId: null,
+  lastFinishReason: null,
   lastError: null,
   network: "disabled",
   vault: "not_indexed",
@@ -73,6 +82,37 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
     } as T;
   }
 
+  if (command === "send_local_prompt_streaming") {
+    const prompt = String(args?.prompt ?? "");
+    const mode = (args?.mode === "thinking" ? "thinking" : "fast") as RuntimeMode;
+
+    if (prompt.trim() === "/fail") {
+      throw new Error("Sprint 0 mocked command failure.");
+    }
+
+    return {
+      generationId: "mock:fallback",
+      finalText: "Local inference is not connected yet. This is the Sprint 0 mocked response.",
+      finishReason: "mock_fallback",
+      elapsedMs: 0,
+      route: "local_mock",
+      modelId: null,
+      cancelled: false,
+      timedOut: false,
+      error: null,
+      mode
+    } as T;
+  }
+
+  if (command === "cancel_generation") {
+    return {
+      generationId: typeof args?.generationId === "string" ? args.generationId : null,
+      state: "cancelled",
+      cancelled: true,
+      message: "Mock local generation cancelled."
+    } as T;
+  }
+
   if (command === "run_runtime_benchmark") {
     throw new Error("Runtime benchmark requires the native Tauri app with validated local sidecar and model paths.");
   }
@@ -86,6 +126,14 @@ const defaultInvoker: TauriInvoker = async <T>(command: string, args?: CommandAr
   }
 
   return mockInvoke<T>(command, args);
+};
+
+const defaultStreamSubscriber: StreamEventSubscriber = async (handler) => {
+  if (hasTauriRuntime()) {
+    return listen<LocalPromptStreamEvent>(LOCAL_PROMPT_STREAM_EVENT, (event) => handler(event.payload));
+  }
+
+  return () => undefined;
 };
 
 export async function healthCheck(invoker: TauriInvoker = defaultInvoker) {
@@ -105,6 +153,35 @@ export async function sendLocalPrompt(prompt: string, mode: RuntimeMode, invoker
     prompt: prompt.trim(),
     mode
   });
+}
+
+export async function sendLocalPromptStreaming(
+  prompt: string,
+  mode: RuntimeMode,
+  onEvent: (event: LocalPromptStreamEvent) => void,
+  invoker: TauriInvoker = defaultInvoker,
+  subscribeToStream: StreamEventSubscriber = defaultStreamSubscriber
+) {
+  if (!isPromptValid(prompt)) {
+    throw new Error("Enter a prompt before sending.");
+  }
+
+  const unlisten = await subscribeToStream(onEvent);
+  try {
+    return await invoker<StreamingPromptResult>("send_local_prompt_streaming", {
+      prompt: prompt.trim(),
+      mode,
+      modelId: "qwen-0_8b-local",
+      maxTokens: 120,
+      stream: true
+    });
+  } finally {
+    unlisten();
+  }
+}
+
+export async function cancelGeneration(generationId?: string | null, invoker: TauriInvoker = defaultInvoker) {
+  return invoker<CancelGenerationResponse>("cancel_generation", { generationId: generationId ?? null });
 }
 
 export async function runRuntimeBenchmark(mode: RuntimeMode, invoker: TauriInvoker = defaultInvoker) {

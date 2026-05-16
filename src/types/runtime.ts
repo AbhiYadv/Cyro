@@ -4,7 +4,9 @@ import type { SidecarBinaryStatus } from "./sidecar";
 export type RuntimeMode = "fast" | "thinking";
 export type RuntimeRoute = "local_mock" | "local_sidecar";
 export type RuntimeState = "not_configured" | "sidecar_ready" | "model_valid" | "ready" | "generating" | "error";
-export type FinishReason = "completed" | "mock_fallback";
+export type FinishReason = "completed" | "mock_fallback" | "cancelled" | "timed_out" | "error";
+export type GenerationState = "idle" | "starting" | "streaming" | "cancelling" | "cancelled" | "completed" | "timed_out" | "failed";
+export type StreamEventType = "started" | "delta" | "completed" | "cancelled" | "timeout" | "error";
 export type BenchmarkStatus = "not_run" | "running" | "passed" | "slow" | "failed" | "blocked";
 export type LatencyClass = "fast" | "acceptable" | "slow" | "blocked" | "unknown";
 
@@ -42,6 +44,9 @@ export type RuntimeStatus = {
   localModel: ModelRegistryEntry | null;
   modelRegistry: ModelRegistryEntry[];
   benchmark: RuntimeBenchmarkStatus;
+  generationState: GenerationState;
+  activeGenerationId: string | null;
+  lastFinishReason: FinishReason | null;
   lastError: RuntimeCommandError | null;
   network: "disabled";
   vault: "not_indexed";
@@ -62,6 +67,37 @@ export type LocalPromptResponse = {
   elapsedMs: number;
   finishReason: FinishReason;
   mocked: boolean;
+};
+
+export type LocalPromptStreamEvent = {
+  generationId: string;
+  eventType: StreamEventType;
+  delta: string | null;
+  elapsedMs: number;
+  modelId: string | null;
+  route: RuntimeRoute;
+  sequence: number;
+  finishReason: FinishReason | null;
+  error: RuntimeCommandError | null;
+};
+
+export type StreamingPromptResult = {
+  generationId: string;
+  finalText: string;
+  finishReason: FinishReason;
+  elapsedMs: number;
+  route: RuntimeRoute;
+  modelId: string | null;
+  cancelled: boolean;
+  timedOut: boolean;
+  error: RuntimeCommandError | null;
+};
+
+export type CancelGenerationResponse = {
+  generationId: string | null;
+  state: GenerationState;
+  cancelled: boolean;
+  message: string;
 };
 
 export type RuntimeCommandError = {

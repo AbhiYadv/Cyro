@@ -24,6 +24,9 @@ const defaultRuntimeStatus: RuntimeStatus = {
     latestResult: null,
     message: "Benchmark has not run. Configure local runtime paths before benchmarking."
   },
+  generationState: "idle",
+  activeGenerationId: null,
+  lastFinishReason: null,
   lastError: null,
   network: "disabled",
   vault: "not_indexed",

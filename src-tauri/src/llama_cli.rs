@@ -7,7 +7,7 @@ use std::{
 use crate::runtime_types::{FinishReason, RuntimeError};
 
 const DEFAULT_PROMPT_TIMEOUT_SECS: u64 = 60;
-const MAX_DEBUG_CHARS: usize = 1_200;
+pub(crate) const MAX_DEBUG_CHARS: usize = 1_200;
 const LLAMA_CLI_FIXED_ARGS: [&str; 5] = [
     "--single-turn",
     "--no-display-prompt",
@@ -147,7 +147,7 @@ fn runtime_wait_error(error: std::io::Error) -> RuntimeError {
     )
 }
 
-fn cleanup_stdout(stdout: &str, prompt: &str) -> String {
+pub(crate) fn cleanup_stdout(stdout: &str, prompt: &str) -> String {
     let mut cleaned = stdout.replace("\r\n", "\n").trim().to_string();
     let prompt = prompt.trim();
 
@@ -173,7 +173,7 @@ fn cleanup_stdout(stdout: &str, prompt: &str) -> String {
         .to_string()
 }
 
-fn sanitize_debug_output(output: &str, prompt: &str) -> String {
+pub(crate) fn sanitize_debug_output(output: &str, prompt: &str) -> String {
     let redacted = if prompt.trim().is_empty() {
         output.to_string()
     } else {

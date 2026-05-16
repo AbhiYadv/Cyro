@@ -3,9 +3,11 @@ import { setModelPath, validateModelPath } from "../../services/modelRegistry";
 import {
   benchmarkStatusLabel,
   composeActionableMessage,
+  finishReasonLabel,
   formatBenchmarkElapsed,
   formatBenchmarkTokens,
   formatModelFile,
+  generationStateLabel,
   isBenchmarkRunnable,
   isLocalRuntimeReady,
   latencyClassLabel,
@@ -51,6 +53,9 @@ export function RuntimePanel({ status, onStatusRefresh }: RuntimePanelProps) {
   const latestBenchmark = status.benchmark.latestResult;
   const rows = [
     ["Runtime", runtimeStateLabel(status.runtimeState)],
+    ["Generation", generationStateLabel(status.generationState)],
+    ["Active Generation", status.activeGenerationId ?? "None"],
+    ["Last Finish", finishReasonLabel(status.lastFinishReason)],
     ["Route", routeLabel(status.activeRoute)],
     ["Benchmark", benchmarkStatusLabel(status.benchmark.status)],
     ["Model", status.localModel?.validated ? status.localModel.displayName : "Not Configured"],

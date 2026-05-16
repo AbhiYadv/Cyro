@@ -643,6 +643,52 @@ CYRO-0011B implementation must include tests for:
 - cancelled message is labeled
 - timeout and error states are actionable
 
+## CYRO-0011B Streaming stdout Implementation
+
+CYRO-0011B implements the CYRO-0011A process lifecycle contract for the local `llama-cli` route. It does not add model files, sidecar binaries, downloads, `llama-server`, Rust FFI, Python, cloud APIs, provider APIs, PGLite persistence, sync, mobile, VPN, AgentScope, or queueing.
+
+Commands:
+- `send_local_prompt_streaming`
+- `cancel_generation`
+
+Tauri event:
+- `cyro://local-prompt-stream`
+
+Implemented stream event names:
+- `started`
+- `delta`
+- `completed`
+- `cancelled`
+- `timeout`
+- `error`
+
+Streaming behavior:
+- Rust validates the configured `llama-cli` path and `.gguf` model path before starting a stream.
+- Rust spawns `llama-cli` with structured `Command` args only.
+- Rust reads stdout incrementally and emits ordered `delta` events.
+- React subscribes to stream events and appends deltas to the active assistant message.
+- The final result replaces the partial message with cleaned stdout.
+- Non-streaming `send_local_prompt` remains available as a fallback path.
+- `local_mock` fallback remains available when no sidecar and no model path are configured.
+
+Cancel behavior:
+- only one active local generation is allowed
+- a second streaming generation returns a recoverable `generation_busy` error
+- `cancel_generation` targets the active Rust-owned child process
+- cancel requests move the active generation to `cancelling`
+- the child process is killed through Rust process control
+- final stream state is emitted as `cancelled`
+- partial output may remain visible and is labeled `Cancelled`
+- active generation state is cleared before another local generation can begin
+
+Timeout and failure behavior:
+- streaming uses the same conservative timeout window as the non-streaming prompt path
+- timeout kills or reaps the child process and emits `timeout`
+- nonzero exit and empty response emit `error`
+- stderr/debug detail is bounded and prompt-redacted before it reaches UI state
+- prompt content is not logged by default
+- streamed or partial output is not written to memory automatically
+
 ## LocalModelConfig
 
 Fields:
@@ -739,9 +785,9 @@ Benchmark must never upload telemetry.
 
 ## Streaming and Cancellation
 
-Initial sidecar implementation may return full responses. CYRO-0011A locks the contract for optional `llama-cli` stdout streaming, Rust-owned cancellation, timeout cleanup, partial output labeling, and non-streaming fallback.
+Initial sidecar implementation may return full responses through `send_local_prompt`. CYRO-0011B adds optional `llama-cli` stdout streaming through `send_local_prompt_streaming` and keeps the non-streaming path available as fallback.
 
-CYRO-0011B may implement streaming only after the CYRO-0011A process lifecycle contract is satisfied. `llama-server` remains later work.
+`llama-server` remains later work.
 
 ## Security Requirements
 

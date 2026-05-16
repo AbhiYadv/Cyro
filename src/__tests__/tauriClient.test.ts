@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   formatRuntimeError,
+  cancelGeneration,
   getRuntimeStatus,
   isPromptValid,
   runRuntimeBenchmark,
   sendLocalPrompt,
+  sendLocalPromptStreaming,
   type TauriInvoker
 } from "../services/tauriClient";
+import type { LocalPromptStreamEvent } from "../types/runtime";
 
 describe("tauriClient Sprint 0 contract", () => {
   it("rejects empty prompts before invoking Tauri", async () => {
@@ -59,6 +62,93 @@ describe("tauriClient Sprint 0 contract", () => {
       modelId: "qwen-0_8b-local",
       mocked: false
     });
+  });
+
+  it("invokes streaming prompt command and receives ordered events", async () => {
+    const receivedEvents: LocalPromptStreamEvent[] = [];
+    let streamHandler: ((event: LocalPromptStreamEvent) => void) | null = null;
+    const subscribe = async (handler: (event: LocalPromptStreamEvent) => void) => {
+      streamHandler = handler;
+      return () => {
+        streamHandler = null;
+      };
+    };
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("send_local_prompt_streaming");
+      expect(args).toMatchObject({
+        prompt: "Answer locally",
+        mode: "fast",
+        modelId: "qwen-0_8b-local",
+        maxTokens: 120,
+        stream: true
+      });
+      streamHandler?.({
+        generationId: "generation:1",
+        eventType: "started",
+        delta: null,
+        elapsedMs: 0,
+        modelId: "qwen-0_8b-local",
+        route: "local_sidecar",
+        sequence: 0,
+        finishReason: null,
+        error: null
+      });
+      streamHandler?.({
+        generationId: "generation:1",
+        eventType: "delta",
+        delta: "local ",
+        elapsedMs: 4,
+        modelId: "qwen-0_8b-local",
+        route: "local_sidecar",
+        sequence: 1,
+        finishReason: null,
+        error: null
+      });
+      streamHandler?.({
+        generationId: "generation:1",
+        eventType: "completed",
+        delta: null,
+        elapsedMs: 8,
+        modelId: "qwen-0_8b-local",
+        route: "local_sidecar",
+        sequence: 2,
+        finishReason: "completed",
+        error: null
+      });
+      return {
+        generationId: "generation:1",
+        finalText: "local answer",
+        finishReason: "completed",
+        elapsedMs: 8,
+        route: "local_sidecar",
+        modelId: "qwen-0_8b-local",
+        cancelled: false,
+        timedOut: false,
+        error: null
+      } as T;
+    };
+
+    const result = await sendLocalPromptStreaming("Answer locally", "fast", (event) => receivedEvents.push(event), invoker, subscribe);
+
+    expect(result.finalText).toBe("local answer");
+    expect(receivedEvents.map((event) => event.eventType)).toEqual(["started", "delta", "completed"]);
+  });
+
+  it("invokes cancel_generation with the active generation id", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("cancel_generation");
+      expect(args).toEqual({ generationId: "generation:1" });
+      return {
+        generationId: "generation:1",
+        state: "cancelling",
+        cancelled: true,
+        message: "Cancellation requested."
+      } as T;
+    };
+
+    const result = await cancelGeneration("generation:1", invoker);
+
+    expect(result).toMatchObject({ cancelled: true, state: "cancelling" });
   });
 
   it("invokes the native local benchmark command with fixed development gate arguments", async () => {

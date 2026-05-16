@@ -72,7 +72,7 @@
 - [ ] Timeout kills or reaps the child process
 - [ ] Nonzero exit returns an actionable runtime error
 - [ ] Stderr/debug output is bounded and prompt-redacted before surfacing
-- [ ] Streaming and cancellation UX remain future work
+- [ ] Non-streaming prompt execution remains available when streaming is not used
 
 ## Runtime Setup UI
 - [ ] Sidecar path validation is invoked through Rust/Tauri only
@@ -100,6 +100,7 @@
 - [ ] Rust/Tauri owns sidecar child process lifecycle, stdout reading, stderr reading, cancellation, timeout, and cleanup
 - [ ] React does not spawn, supervise, terminate, or directly control the sidecar process
 - [ ] Streaming uses Tauri events or an equivalent Rust-owned event channel
+- [ ] Streaming event payloads use `started`, `delta`, `completed`, `cancelled`, `timeout`, and `error`
 - [ ] Non-streaming prompt execution remains available as a fallback
 - [ ] Only one local generation can be active at a time
 - [ ] Send is blocked while generation state is `starting`, `streaming`, or `cancelling`
