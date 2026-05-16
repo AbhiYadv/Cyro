@@ -126,7 +126,10 @@ pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput,
                     "sidecar_empty_response",
                     "The local llama.cpp sidecar returned no text.",
                     "Try a shorter prompt or a different validated GGUF model.",
-                    Some(empty_stdout_debug(&stdout, &stderr, &request.prompt)),
+                    Some(format!(
+                        "elapsedMs={elapsed_ms}; {}",
+                        empty_stdout_debug(&stdout, &stderr, &request.prompt)
+                    )),
                 ));
             }
 
@@ -209,27 +212,45 @@ pub(crate) fn cleanup_stdout(stdout: &str, prompt: &str) -> String {
         }
     }
 
-    answer_lines
-        .join("\n")
-        .trim()
-        .to_string()
+    answer_lines.join("\n").trim().to_string()
 }
 
 pub(crate) fn empty_stdout_debug(stdout: &str, stderr: &str, prompt: &str) -> String {
     let stderr = sanitize_debug_output(stderr, prompt);
+    let stderr_shape = stream_shape("stderr", stderr.as_str(), prompt);
     if stderr.trim().is_empty() {
-        stdout_shape_diagnostics(stdout, prompt)
+        format!(
+            "{}; {}",
+            stdout_shape_diagnostics(stdout, prompt),
+            stderr_shape
+        )
     } else {
         format!(
-            "{}; stderr={}",
+            "{}; {}; stderr={}",
             stdout_shape_diagnostics(stdout, prompt),
+            stderr_shape,
             stderr
         )
     }
 }
 
 pub(crate) fn stdout_shape_diagnostics(stdout: &str, prompt: &str) -> String {
-    let cleaned = normalize_terminal_output(stdout);
+    stream_shape("stdout", stdout, prompt)
+}
+
+pub(crate) fn extract_elapsed_ms_from_debug(debug: &str) -> Option<u64> {
+    let elapsed_marker = "elapsedMs=";
+    let start = debug.find(elapsed_marker)? + elapsed_marker.len();
+    let value = debug[start..]
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit())
+        .collect::<String>();
+
+    value.parse().ok()
+}
+
+fn stream_shape(label: &str, output: &str, prompt: &str) -> String {
+    let cleaned = normalize_terminal_output(output);
     let prompt = prompt.trim();
     let mut blank_lines = 0;
     let mut prompt_marker_lines = 0;
@@ -239,16 +260,31 @@ pub(crate) fn stdout_shape_diagnostics(stdout: &str, prompt: &str) -> String {
     let mut exiting_lines = 0;
     let mut answer_candidate_lines = 0;
     let mut total_lines = 0;
+    let mut non_empty_lines = 0;
+    let mut first_non_empty: Option<String> = None;
+    let mut last_non_empty: Option<String> = None;
+    let mut timing_footer_found = false;
 
     for raw_line in cleaned.lines() {
         total_lines += 1;
         let trimmed = raw_line.trim();
         if trimmed.is_empty() {
             blank_lines += 1;
-        } else if prompt_line_remainder(trimmed, prompt).is_some() || is_prompt_shell_line(trimmed) {
+            continue;
+        }
+
+        non_empty_lines += 1;
+        let safe_line = sanitize_debug_line(trimmed, prompt);
+        if first_non_empty.is_none() {
+            first_non_empty = Some(safe_line.clone());
+        }
+        last_non_empty = Some(safe_line);
+
+        if prompt_line_remainder(trimmed, prompt).is_some() || is_prompt_shell_line(trimmed) {
             prompt_marker_lines += 1;
         } else if is_timing_line(trimmed) {
             timing_lines += 1;
+            timing_footer_found = true;
         } else if is_repl_command_line(trimmed) {
             command_lines += 1;
         } else if is_metadata_or_banner_line(trimmed) || is_available_commands_header(trimmed) {
@@ -261,9 +297,22 @@ pub(crate) fn stdout_shape_diagnostics(stdout: &str, prompt: &str) -> String {
     }
 
     format!(
-        "stdoutShape=bytes:{},lines:{total_lines},blank:{blank_lines},promptMarkers:{prompt_marker_lines},timing:{timing_lines},commands:{command_lines},metadata:{metadata_lines},exiting:{exiting_lines},answerCandidates:{answer_candidate_lines}",
-        stdout.len()
+        "{label}Shape=bytes:{},lines:{total_lines},nonEmpty:{non_empty_lines},blank:{blank_lines},promptMarkers:{prompt_marker_lines},timing:{timing_lines},timingFooterFound:{timing_footer_found},commands:{command_lines},metadata:{metadata_lines},exiting:{exiting_lines},answerCandidates:{answer_candidate_lines},first:{},last:{}",
+        output.len(),
+        first_non_empty.unwrap_or_else(|| "[none]".to_string()),
+        last_non_empty.unwrap_or_else(|| "[none]".to_string())
     )
+}
+
+fn sanitize_debug_line(line: &str, prompt: &str) -> String {
+    let redacted = sanitize_debug_output(line, prompt);
+    redacted
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(180)
+        .collect()
 }
 
 pub(crate) fn sanitize_debug_output(output: &str, prompt: &str) -> String {
@@ -278,14 +327,23 @@ pub(crate) fn sanitize_debug_output(output: &str, prompt: &str) -> String {
 
 fn normalize_terminal_output(output: &str) -> String {
     let mut normalized = String::new();
-    let output = output.replace("\r\n", "\n");
+    let output = output.replace("\r\n", "\n").replace('\r', "\n");
     let mut chars = output.chars().peekable();
 
     while let Some(ch) = chars.next() {
         if ch == '\u{1b}' {
-            while let Some(next) = chars.next() {
-                if ('@'..='~').contains(&next) {
-                    break;
+            if chars.peek() == Some(&'[') {
+                let _ = chars.next();
+                while let Some(next) = chars.next() {
+                    if ('@'..='~').contains(&next) {
+                        break;
+                    }
+                }
+            } else {
+                while let Some(next) = chars.next() {
+                    if ('@'..='~').contains(&next) {
+                        break;
+                    }
                 }
             }
             continue;
@@ -312,18 +370,24 @@ fn prompt_line_remainder(line: &str, prompt: &str) -> Option<String> {
     }
 
     let without_marker = line.strip_prefix('>').map(str::trim).unwrap_or(line);
-    without_marker
-        .find(prompt)
-        .map(|prompt_start| without_marker[prompt_start + prompt.len()..].trim().to_string())
+    without_marker.find(prompt).map(|prompt_start| {
+        without_marker[prompt_start + prompt.len()..]
+            .trim()
+            .to_string()
+    })
 }
 
 fn answer_line_from_candidate(line: &str, prompt: &str) -> Option<String> {
-    let candidate = line.trim();
+    let candidate = strip_inline_decorations(line).trim();
     if candidate.is_empty() || is_llama_decoration_line(candidate) {
         return None;
     }
 
-    let candidate = candidate.strip_prefix('>').map(str::trim).unwrap_or(candidate);
+    let candidate = candidate
+        .strip_prefix('>')
+        .map(str::trim)
+        .unwrap_or(candidate);
+    let candidate = strip_inline_decorations(candidate).trim();
     if candidate.is_empty() {
         return None;
     }
@@ -337,6 +401,17 @@ fn answer_line_from_candidate(line: &str, prompt: &str) -> Option<String> {
     } else {
         Some(candidate.to_string())
     }
+}
+
+fn strip_inline_decorations(line: &str) -> &str {
+    let mut end = line.len();
+    for marker in ["[ Prompt:", "Exiting..."] {
+        if let Some(index) = line.find(marker) {
+            end = end.min(index);
+        }
+    }
+
+    line[..end].trim()
 }
 
 fn is_llama_decoration_line(line: &str) -> bool {
@@ -531,6 +606,33 @@ Exiting...
     }
 
     #[test]
+    fn cleanup_stdout_extracts_benchmark_output_with_progress_spinner() {
+        let prompt = "Answer with exactly three short bullets about what local inference means.";
+        let stdout = format!(
+            "Loading model... |\u{8}-\u{8}\\\u{8}|\u{8}/\u{8} \u{8}\n\n\n▄▄ ▄▄\n██ ██\n\nbuild      : b9162-d52844458\nmodel      : qwen2.5-0.5b-instruct-q4_k_m.gguf\nmodalities : text\n\navailable commands:\n  /exit or Ctrl+C     stop or exit\n  /regen              regenerate the last response\n  /clear              clear the chat history\n  /read <file>        add a text file\n  /glob <pattern>     add text files using globbing pattern\n\n\n> {prompt}\n\n|\u{8}-\u{8} \u{8}Local inference means a model runs on this device.\n- It avoids provider or cloud calls for that request.\n- It depends on local hardware, model, and runtime limits.\n\n[ Prompt: 321.7 t/s | Generation: 114.1 t/s ]\n\nExiting...\n"
+        );
+
+        let cleaned = super::cleanup_stdout(&stdout, prompt);
+
+        assert_eq!(
+            cleaned,
+            "Local inference means a model runs on this device.\n- It avoids provider or cloud calls for that request.\n- It depends on local hardware, model, and runtime limits."
+        );
+    }
+
+    #[test]
+    fn cleanup_stdout_strips_inline_timing_footer_without_dropping_answer() {
+        let prompt = "Say hello in one sentence.";
+        let stdout = format!(
+            "> {prompt}\nHello from Cyro. [ Prompt: 10.0 t/s | Generation: 20.0 t/s ]\nExiting...\n"
+        );
+
+        let cleaned = super::cleanup_stdout(&stdout, prompt);
+
+        assert_eq!(cleaned, "Hello from Cyro.");
+    }
+
+    #[test]
     fn stdout_shape_diagnostics_are_bounded_and_prompt_free() {
         let prompt = "private prompt";
         let stdout = format!(
@@ -542,7 +644,22 @@ Exiting...
         assert!(diagnostics.contains("stdoutShape="));
         assert!(diagnostics.contains("promptMarkers:1"));
         assert!(diagnostics.contains("timing:1"));
+        assert!(diagnostics.contains("timingFooterFound:true"));
+        assert!(diagnostics.contains("first:Loading model"));
+        assert!(diagnostics.contains("last:Exiting"));
         assert!(!diagnostics.contains(prompt));
+    }
+
+    #[test]
+    fn elapsed_ms_is_extractable_from_safe_debug_detail() {
+        assert_eq!(
+            super::extract_elapsed_ms_from_debug("elapsedMs=1640; stdoutShape=bytes:10,lines:1"),
+            Some(1640)
+        );
+        assert_eq!(
+            super::extract_elapsed_ms_from_debug("stdoutShape=bytes:0"),
+            None
+        );
     }
 
     #[test]
@@ -612,6 +729,27 @@ Exiting...
         let output = run_llama_cli_prompt(&request).expect("manual sidecar prompt should run");
 
         assert!(!output.response.trim().is_empty());
+    }
+
+    #[test]
+    #[ignore]
+    fn manual_llama_cli_benchmark_prompt_from_env() {
+        let binary_path = std::env::var("CYRO_TEST_LLAMA_CLI_PATH")
+            .expect("CYRO_TEST_LLAMA_CLI_PATH must point to llama-cli");
+        let model_path =
+            std::env::var("CYRO_TEST_MODEL_PATH").expect("CYRO_TEST_MODEL_PATH must point to GGUF");
+        let request = LlamaCliRequest::new(
+            binary_path,
+            model_path,
+            "Answer with exactly three short bullets about what local inference means.".to_string(),
+            80,
+        );
+
+        let output =
+            run_llama_cli_prompt(&request).expect("manual benchmark prompt should extract text");
+
+        assert!(!output.response.trim().is_empty());
+        assert!(output.elapsed_ms > 0);
     }
 
     struct TestSandbox {

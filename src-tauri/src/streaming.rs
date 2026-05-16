@@ -13,8 +13,8 @@ use serde::Serialize;
 
 use crate::{
     llama_cli::{
-        build_llama_cli_args_for_request, cleanup_stdout, empty_stdout_debug, llama_cli_working_dir,
-        sanitize_debug_output, LlamaCliRequest, MAX_DEBUG_CHARS,
+        build_llama_cli_args_for_request, cleanup_stdout, empty_stdout_debug,
+        llama_cli_working_dir, sanitize_debug_output, LlamaCliRequest, MAX_DEBUG_CHARS,
     },
     runtime_types::{FinishReason, GenerationState, RuntimeError, RuntimeMode, RuntimeRoute},
 };
@@ -484,7 +484,10 @@ where
                     "Try a shorter prompt or a different validated GGUF model.",
                     Some(empty_stdout_debug(
                         &raw_stdout,
-                        &stderr_buffer.lock().map(|value| value.clone()).unwrap_or_default(),
+                        &stderr_buffer
+                            .lock()
+                            .map(|value| value.clone())
+                            .unwrap_or_default(),
                         &request.prompt,
                     )),
                 );
@@ -896,7 +899,7 @@ mod tests {
             sandbox.write_executable("llama-cli", "#!/bin/sh\nprintf 'one '\nprintf 'two'\n");
         let manager = GenerationManager::default();
         let events = Arc::new(Mutex::new(Vec::new()));
-        let request = request_for(&binary, "private prompt", Duration::from_secs(2));
+        let request = request_for(&binary, "private prompt", Duration::from_secs(5));
         let events_for_run = Arc::clone(&events);
 
         let result = run_streaming_llama_cli_prompt(

@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::llama_cli::{dev_cpu_fallback_enabled, run_llama_cli_prompt, LlamaCliRequest};
+use crate::llama_cli::{
+    dev_cpu_fallback_enabled, extract_elapsed_ms_from_debug, run_llama_cli_prompt, LlamaCliRequest,
+};
 use crate::model_registry::{
     validate_model_path_value, ModelRegistryEntry, ModelRegistryState, PLACEHOLDER_MODEL_ID,
 };
@@ -304,12 +306,28 @@ fn benchmark_error_result(
     } else {
         LatencyClass::Unknown
     };
-    let elapsed_ms = if error.code == "sidecar_timeout" {
-        sanitize_benchmark_timeout_ms(request.timeout_ms)
+    let elapsed_ms = error
+        .debug_detail_safe
+        .as_deref()
+        .and_then(extract_elapsed_ms_from_debug)
+        .unwrap_or_else(|| {
+            if error.code == "sidecar_timeout" {
+                sanitize_benchmark_timeout_ms(request.timeout_ms)
+            } else {
+                0
+            }
+        });
+    let reason = if error.code == "sidecar_empty_response" {
+        match error.debug_detail_safe.as_deref() {
+            Some(debug_detail) if !debug_detail.trim().is_empty() => format!(
+                "Benchmark failed: {} Safe diagnostic: {}",
+                error.message, debug_detail
+            ),
+            _ => format!("Benchmark failed: {}", error.message),
+        }
     } else {
-        0
+        format!("Benchmark failed: {}", error.message)
     };
-    let reason = format!("Benchmark failed: {}", error.message);
 
     build_result(
         request,
@@ -543,6 +561,27 @@ mod tests {
         assert_eq!(result.status, BenchmarkStatus::Failed);
         assert_eq!(result.latency_class, LatencyClass::Unknown);
         assert!(!result.passed);
+    }
+
+    #[test]
+    fn benchmark_empty_response_keeps_elapsed_time_and_safe_diagnostic() {
+        let error = RuntimeError::recoverable(
+            "sidecar_empty_response",
+            "The local llama.cpp sidecar returned no text.",
+            "Try a shorter prompt.",
+            Some(
+                "elapsedMs=1640; stdoutShape=bytes:100,lines:4,nonEmpty:3,blank:1,promptMarkers:1,timing:1,timingFooterFound:true,commands:0,metadata:1,exiting:1,answerCandidates:0,first:Loading model,last:Exiting...; stderrShape=bytes:0,lines:0,nonEmpty:0,blank:0,promptMarkers:0,timing:0,timingFooterFound:false,commands:0,metadata:0,exiting:0,answerCandidates:0,first:[none],last:[none]"
+                    .to_string(),
+            ),
+        );
+
+        let result = benchmark_error_result(&request(), None, error);
+
+        assert_eq!(result.status, BenchmarkStatus::Failed);
+        assert_eq!(result.elapsed_ms, 1640);
+        assert!(result.reason.contains("Safe diagnostic"));
+        assert!(result.reason.contains("stdoutShape="));
+        assert!(!result.reason.contains(BENCHMARK_PROMPT));
     }
 
     #[test]
