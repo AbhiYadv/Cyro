@@ -98,6 +98,10 @@ Requirements:
 - benchmark gates are required before selecting benchmark-gated models
 - model quality gates are required before selecting a default local answer model
 - local model selection requires both benchmark evidence and answer-quality evidence
+- local responses should stream when supported by the Rust-supervised sidecar path
+- user can cancel a running local generation
+- cancel, timeout, and failed generation states are visible and actionable
+- streamed or partial local output is never written to memory automatically
 
 The current Sprint 0 shell is a demo baseline, not the final Local Brain UX. The Local Brain UX will be redesigned in later implementation tasks.
 

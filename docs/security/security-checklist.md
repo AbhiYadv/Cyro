@@ -96,6 +96,24 @@
 - [ ] No automatic startup benchmark, benchmark loop, telemetry upload, cloud fallback, provider call, model download, or model file commit is added
 - [ ] Prompt content is not logged by default and safe stderr/debug summaries remain bounded
 
+## Streaming and Cancel
+- [ ] Rust/Tauri owns sidecar child process lifecycle, stdout reading, stderr reading, cancellation, timeout, and cleanup
+- [ ] React does not spawn, supervise, terminate, or directly control the sidecar process
+- [ ] Streaming uses Tauri events or an equivalent Rust-owned event channel
+- [ ] Non-streaming prompt execution remains available as a fallback
+- [ ] Only one local generation can be active at a time
+- [ ] Send is blocked while generation state is `starting`, `streaming`, or `cancelling`
+- [ ] `cancel_generation` terminates the active Rust-owned child process and clears generating state
+- [ ] Timeout terminates or force-kills the child process and clears generating state
+- [ ] child process cleanup is verified for cancel, timeout, process failure, and app-side failure paths
+- [ ] No shell command string, `shell=true`, command concatenation, or frontend-provided sidecar args are used
+- [ ] no prompt logs are written by default during streaming, cancellation, timeout, or error handling
+- [ ] bounded stderr and safe debug detail are used before any diagnostic text reaches the UI
+- [ ] Partial streamed output is not written to memory automatically
+- [ ] Cancelled and timed-out partial output is visibly labeled
+- [ ] No telemetry, cloud fallback, provider call, model download, or hidden background retry is added
+- [ ] Model and sidecar paths remain validated by Rust before any generation starts
+
 ## Model Path Validation
 - [ ] Rust/Tauri validates all model filesystem paths
 - [ ] Frontend does not validate filesystem paths directly

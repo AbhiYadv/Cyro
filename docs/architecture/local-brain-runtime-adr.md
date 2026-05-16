@@ -489,6 +489,160 @@ Evaluation records must include latency, token estimate, cold start observation,
 
 CYRO-0011 or a follow-up may test larger models manually using user-provided local GGUF paths. Those tests must not add model downloads, model files, model marketplace UX, or automatic model switching.
 
+## CYRO-0011A Streaming and Cancel Contract
+
+CYRO-0011A defines the streaming stdout and cancel/kill contract before implementation. It does not add streaming code, cancellation code, `llama-server`, model files, binaries, downloads, Rust FFI, Python, cloud APIs, provider APIs, or persistence.
+
+Streaming strategy:
+- CYRO-0011B should stream local sidecar stdout from Rust to React through Tauri events or an equivalent Rust-owned event channel.
+- Initial streaming target is `llama-cli` stdout, not `llama-server`.
+- React must not spawn, supervise, terminate, or directly control the sidecar process.
+- Rust owns process lifecycle, stdout reading, stderr reading, timeout, cancellation, cleanup, and safe diagnostics.
+- Streaming must be optional; the CYRO-0007 non-streaming `send_local_prompt` path remains the fallback.
+- The same validated sidecar path and validated GGUF model path gates apply before streaming starts.
+
+Generation concurrency:
+- Only one local generation may run at a time in CYRO-0011B.
+- `starting`, `streaming`, and `cancelling` are active states.
+- A new prompt must not start until the previous generation completes, cancels, times out, or fails.
+- Future queueing is out of scope.
+
+Cancel strategy:
+- `cancel_generation` targets the active child process owned by Rust.
+- Cancel must move generation state to `cancelling`, then to `cancelled` after the child exits or is killed.
+- Cancel must clear the app's generating state.
+- Cancel returns a recoverable cancelled result, not an application crash.
+- If graceful termination fails, Rust may force-kill the child process and return bounded safe debug detail.
+
+Timeout strategy:
+- Runtime must enforce a maximum generation timeout.
+- Timeout must terminate or force-kill the child process.
+- Timeout must clear generating state.
+- Timeout result must be actionable and suggest a smaller model, fewer tokens, or retry.
+
+Partial output strategy:
+- Partial output may be shown while streaming.
+- If cancelled, the UI may keep partial output labeled `cancelled`.
+- If timeout occurs, the UI may keep partial output labeled `timed_out`.
+- If the process fails before useful output, the UI shows an actionable `RuntimeError`.
+- Partial output must not be written to memory automatically.
+
+Stderr and diagnostics:
+- Rust may capture stderr for safe diagnostics.
+- Prompt content must not be logged by default.
+- UI must not show large raw stderr dumps.
+- `debugDetailSafe` must be bounded, prompt-redacted, and safe to display.
+
+### GenerationState
+
+Values:
+- `idle`
+- `starting`
+- `streaming`
+- `cancelling`
+- `cancelled`
+- `completed`
+- `timed_out`
+- `failed`
+
+### StreamEvent
+
+Fields:
+- `generationId`
+- `eventType`
+- `delta`
+- `elapsedMs`
+- `modelId`
+- `route`
+- `sequence`
+
+### StreamEventType
+
+Values:
+- `started`
+- `delta`
+- `completed`
+- `cancelled`
+- `timeout`
+- `error`
+
+### CancelGenerationRequest
+
+Fields:
+- `generationId`
+
+### CancelGenerationResponse
+
+Fields:
+- `generationId`
+- `state`
+- `cancelled`
+- `message`
+
+### StreamingPromptRequest
+
+Fields:
+- `prompt`
+- `mode`
+- `modelId`
+- `maxTokens`
+- `temperature`
+- `privacyMode`
+- `stream`
+
+Rules:
+- prompt text remains local
+- prompt content is not logged by default
+- frontend does not provide sidecar arguments
+- streaming prompt requests still use structured Rust-owned sidecar args
+
+### StreamingPromptResult
+
+Fields:
+- `generationId`
+- `finalText`
+- `finishReason`
+- `elapsedMs`
+- `route`
+- `modelId`
+- `cancelled`
+- `timedOut`
+- `error`
+
+### Streaming UI Contract
+
+Chat workspace:
+- Send is disabled while generation is `starting` or `streaming`.
+- Cancel appears while generation is `starting` or `streaming`.
+- Partial output appears in the active assistant message in event sequence order.
+- Cancelled messages are visibly labeled `Cancelled`.
+- Timed-out messages are visibly labeled `Timed out`.
+- Failed messages show an actionable error.
+- Route metadata remains visible: `local_sidecar`, model id/name, and elapsed time.
+
+Runtime panel:
+- shows `GenerationState`
+- shows active model
+- shows active route
+- shows elapsed time while streaming
+- shows last finish reason
+- does not claim final UX polish
+
+### Required CYRO-0011B Tests
+
+CYRO-0011B implementation must include tests for:
+- Rust state transitions `idle` -> `starting` -> `streaming` -> `completed`
+- Rust cancel transition `streaming` -> `cancelling` -> `cancelled`
+- timeout kills or reaps the child and returns `timed_out`
+- only one active generation is allowed
+- structured args are used and no shell command string is used
+- stderr/debug detail is bounded and prompt-redacted
+- Send is disabled while streaming
+- Cancel is visible while streaming
+- partial output is appended in order
+- cancelled message is labeled
+- timeout and error states are actionable
+
 ## LocalModelConfig
 
 Fields:
@@ -585,13 +739,9 @@ Benchmark must never upload telemetry.
 
 ## Streaming and Cancellation
 
-Initial sidecar implementation may return full responses.
+Initial sidecar implementation may return full responses. CYRO-0011A locks the contract for optional `llama-cli` stdout streaming, Rust-owned cancellation, timeout cleanup, partial output labeling, and non-streaming fallback.
 
-Streaming is Phase 1B if needed. Before streaming is implemented, Cyro must still define cancellation behavior:
-- cancel request maps to supervised process interruption or request cancellation
-- stuck generation must have a kill strategy
-- cancel must return a recoverable runtime state
-- partial output handling must be explicitly defined before streaming ships
+CYRO-0011B may implement streaming only after the CYRO-0011A process lifecycle contract is satisfied. `llama-server` remains later work.
 
 ## Security Requirements
 
@@ -625,5 +775,6 @@ Recommended sequence:
 5. Runtime benchmark gate.
 6. Local model candidate evaluation.
 7. Streaming and cancellation contract.
-8. Crisp answer protocol.
-9. Context Capsule Builder ADR.
+8. Streaming stdout implementation.
+9. Crisp answer protocol.
+10. Context Capsule Builder ADR.
