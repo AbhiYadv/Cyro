@@ -14,10 +14,11 @@
 | CYRO-DOCS-0008 | Provider Account Bridge final UX correction | task/CYRO-DOCS-0008-provider-ux-correction | Merged to dev | 10/10 | 2026-05-15 | Docs/tracker only; locks final provider UX as embedded inside Cyro with external browser fallback temporary only |
 | CYRO-0007 | First Local GGUF Prompt via Rust-Supervised Sidecar | task/CYRO-0007-first-local-gguf-prompt | Merged to dev | 10/10 | 2026-05-15 | Adds optional non-streaming `llama-cli` prompt path when sidecar/model paths are validated; mock fallback remains for not configured |
 | CYRO-0008 | Runtime Status/Error UX and Manual Sidecar Path Flow | task/CYRO-0008-runtime-status-path-flow | Merged to dev | 10/10 | 2026-05-15 | Adds manual sidecar/model path validation UI, combined runtime status, and visible `local_mock` vs `local_sidecar` route metadata; no streaming or downloads |
-| CYRO-0009 | Runtime Benchmark Gate for Local GGUF Sidecar | task/CYRO-0009-runtime-benchmark-gate | Ready for Review |  | 2026-05-15 | Adds explicit local-only benchmark button/result for validated `llama-cli` and `.gguf` paths; no startup benchmark, telemetry, downloads, streaming, or model files |
-| CYRO-0010 | Local Model Candidate Evaluation | Phase 1 | Planned |  |  | Uses benchmark evidence to evaluate 0.8B, 1.5B, and 3B candidates without committing model files or binaries |
+| CYRO-0009 | Runtime Benchmark Gate for Local GGUF Sidecar | task/CYRO-0009-runtime-benchmark-gate | Merged to dev | 10/10 | 2026-05-16 | Adds explicit local-only benchmark button/result for validated `llama-cli` and `.gguf` paths; no startup benchmark, telemetry, downloads, streaming, or model files |
+| CYRO-0010 | Local Model Candidate Evaluation Matrix | task/CYRO-0010-local-model-candidate-evaluation | Ready for Review |  | 2026-05-16 | Defines candidate ladder, quality prompts, and matrix fields; tracks 0.5B as `pipeline_only`, not production default |
 | CYRO-0011 | Streaming + Cancel | Phase 1B | Planned |  |  | Defines token streaming, cancellation, partial output, process kill strategy, and richer process lifecycle UX |
 | CYRO-0012 | Crisp Answer Protocol | Phase 1B | Planned |  |  | Defines prompt/runtime answer protocol for concise local answers after runtime proof and benchmark gating |
+| CYRO-0013 | Context Capsule Builder ADR | Phase 3 - Ghost Tree Memory | Planned |  |  | Defines selected memory slice injection before full Ghost Tree implementation; aligns with CYRO-MEMORY-001 |
 | CYRO-PROVIDER-002 | Isolated Provider Session Container Design | Backlog | Planned |  |  | Documents isolated webview/session boundaries without storing provider credentials |
 | CYRO-PROVIDER-003 | Unified Composer Provider Selector UX | Backlog | Planned |  |  | Designs Local/ChatGPT/Claude/Gemini route selector inside one chat UX |
 | CYRO-PROVIDER-004 | Prompt Privacy Scanner | Backlog | Planned |  |  | Defines local scan for secrets/PII/internal data before provider send |
@@ -71,3 +72,15 @@ External browser fallback is temporary and only used when embedded provider sess
 Cyro remains the control plane for memory, vault, privacy filtering, provider route selection, and context capsule preparation.
 
 Provider-owned content must remain visible and user-controlled inside an isolated Cyro provider surface.
+
+## Local Model Evaluation Direction
+
+The 0.5B proof model is tracked as `pipeline_only`, not a production default. It proved local sidecar and benchmark plumbing, but failed technical answer quality.
+
+Model selection requires benchmark plus quality evidence:
+- 0.5B: pipeline proof only, recommended route `none`
+- 0.8B or nearest small Qwen instruct GGUF: Fast candidate to evaluate
+- 1.5B Q4/IQ: Think candidate for capable phone/laptop
+- 3B Q4/IQ: future laptop/Pro candidate, benchmark-gated later
+
+Quality prompts are documented in `docs/architecture/local-model-evaluation.md`. Fast/Think/Pro require benchmark and quality evidence before default model selection.

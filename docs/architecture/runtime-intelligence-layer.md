@@ -8,9 +8,9 @@ This document is architecture and contracts only. It does not authorize llama.cp
 
 ## Decision
 
-Cyro must not hardcode Fast, Think, or Pro to fixed model names. These are routing modes. The Runtime Governor maps each requested mode to the safest available route using device capability, installed models, benchmark data, thermal/battery state, user settings, and trusted node availability.
+Cyro must not hardcode Fast, Think, or Pro to fixed model names. These are routing modes. The Runtime Governor maps each requested mode to the safest available route using device capability, installed models, benchmark data, quality evidence, thermal/battery state, user settings, and trusted node availability.
 
-Local 0.8B remains the always-available fallback. Cyro must not assume every device can run 3B or larger models.
+Local 0.8B remains the always-available fallback target. Cyro must not assume every device can run 3B or larger models, and it must not assume a tiny fast model is acceptable for technical answers.
 
 ## Runtime Intelligence Layer
 
@@ -18,6 +18,7 @@ The Runtime Intelligence Layer has these responsibilities:
 - collect or read device capability before selecting model size
 - maintain installed model metadata
 - gate quantization choices by benchmark data
+- gate default route selection by answer quality evidence
 - choose a route for Fast, Think, and Pro
 - explain why a route was selected
 - reject unsafe local runs under low memory, high thermal pressure, or low battery
@@ -71,8 +72,10 @@ The registry must record:
 - minimum and recommended RAM
 - whether benchmark evidence is required
 - last benchmark id
+- quality gate status
+- last evaluation id
 
-The registry must allow Cyro to distinguish "available in catalog" from "installed locally" and "safe on this device."
+The registry must allow Cyro to distinguish "available in catalog" from "installed locally", "fast enough on this device", and "quality-acceptable for this route."
 
 ## Quantization Policy
 
@@ -104,6 +107,8 @@ Inputs:
 - `HardwareProfile`
 - installed model registry entries
 - benchmark store data
+- local model evaluation matrix data
+- quality gate status
 - user runtime settings
 - privacy and Local Only state
 - future trusted `NodeAvailability`
@@ -134,6 +139,8 @@ Initial CYRO-0009 latency classes:
 
 CYRO-0009 benchmark results are development gates only. Final thresholds may change after 0.8B, 1.5B, and 3B model evaluation.
 
+Benchmark fast does not mean quality acceptable. The 0.5B proof model produced a fast local result, but failed technical answer quality and is classified as `pipeline_only`.
+
 It records local benchmark results needed for safe runtime decisions:
 - benchmark id
 - device id
@@ -155,7 +162,40 @@ It records local benchmark results needed for safe runtime decisions:
 
 Benchmarks are local-first. Cloud telemetry or background upload is out of scope.
 
-Runtime Governor must surface benchmark status when available, but CYRO-0009 does not make Fast, Think, or Pro fully dependent on benchmark results yet. Future CYRO-0010 and CYRO-0011 work can consume benchmark evidence for model candidate evaluation, streaming policy, and routing decisions.
+Runtime Governor must surface benchmark status when available, but CYRO-0009 does not make Fast, Think, or Pro fully dependent on benchmark results yet. CYRO-0010 adds quality evidence requirements for local model candidates. Future CYRO-0011 work can consume benchmark evidence for streaming policy and routing decisions.
+
+## Model Quality Gate
+
+Runtime Intelligence must require model quality evidence before selecting a model as a default Fast, Think, or Pro route.
+
+Fast/Think/Pro require benchmark and quality evidence before a model can be selected as a route candidate.
+
+Quality gate inputs:
+- local model evaluation matrix
+- fixed quality prompt results
+- technical accuracy score
+- instruction following score
+- crispness score
+- manual memory/resource observations
+- benchmark latency class
+- recommended route
+- decision value
+
+Decision values:
+- `pipeline_only`
+- `candidate_fast`
+- `candidate_think`
+- `candidate_pro_later`
+- `blocked_quality`
+- `blocked_latency`
+- `needs_more_testing`
+
+Policy:
+- `pipeline_only` models can validate runtime plumbing only.
+- `blocked_quality` prevents default route selection even when benchmark latency is fast.
+- `blocked_latency` prevents default route selection even when answer quality is acceptable.
+- `needs_more_testing` keeps the candidate visible as an experiment, not a production default.
+- `candidate_fast`, `candidate_think`, and `candidate_pro_later` require explicit benchmark and quality evidence.
 
 ## Laptop Node Discovery Contract
 
@@ -266,15 +306,18 @@ Fast:
 - optimize for immediate local response
 - must not require provider tab, VPN, laptop node, full memory scan, or large model load
 - defaults to Local 0.8B safe path through `local_sidecar` once configured, otherwise demo `local_mock`
+- requires benchmark and quality evidence before a model becomes the Fast default
 
 Think:
 - can use more context and slower local processing
 - may select larger local model only when installed, benchmarked, and resource-safe
+- requires quality evidence for technical accuracy and instruction following
 - may propose future offload only after pairing and explicit approval
 
 Pro:
 - visible as a future mode
 - may require larger local model or trusted laptop route later
+- requires benchmark, resource, and quality evidence before route selection
 - must not silently offload
 - must explain privacy and latency impact before use
 
@@ -289,6 +332,8 @@ Runtime implementation must include tests for:
 - Local Only prevents offload
 - route decision includes human-readable reason
 - missing benchmark blocks benchmark-required model
+- missing quality evidence blocks default model selection
+- fast benchmark with poor technical accuracy remains `pipeline_only` or `blocked_quality`
 
 ## Out Of Scope
 

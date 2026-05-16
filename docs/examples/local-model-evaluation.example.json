@@ -1,0 +1,66 @@
+{
+  "schema": "cyro.localModelEvaluation.v1",
+  "notes": [
+    "Example records only. No GGUF files, model downloads, sidecar binaries, or cloud evaluation are included.",
+    "The 0.5B record is pipeline_only because speed passed but technical answer quality failed."
+  ],
+  "records": [
+    {
+      "modelId": "qwen-0_5b-pipeline-proof",
+      "fileName": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+      "parameterClass": "0.5B",
+      "quantization": "Q4_K_M",
+      "fileSizeMb": null,
+      "configuredPath": "/Users/abhishek/models/cyro/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+      "benchmarkElapsedMs": 1640,
+      "latencyClass": "fast",
+      "tokenEstimate": "18.9 token-ish/sec",
+      "coldStartObservation": "manual test completed quickly",
+      "memoryObservationManual": "not recorded",
+      "technicalAccuracyScore": 1,
+      "instructionFollowingScore": 2,
+      "crispnessScore": 2,
+      "recommendedRoute": "none",
+      "decision": "pipeline_only",
+      "notes": "Pipeline proof only. It incorrectly explained PostgreSQL PITR, so it is blocked from production default selection."
+    },
+    {
+      "modelId": "qwen-0_8b-fast-candidate",
+      "fileName": "TBD user-provided GGUF",
+      "parameterClass": "0.8B",
+      "quantization": "Q4_K_M",
+      "fileSizeMb": null,
+      "configuredPath": "user-local path only",
+      "benchmarkElapsedMs": null,
+      "latencyClass": "unknown",
+      "tokenEstimate": null,
+      "coldStartObservation": "not tested",
+      "memoryObservationManual": "not tested",
+      "technicalAccuracyScore": null,
+      "instructionFollowingScore": null,
+      "crispnessScore": null,
+      "recommendedRoute": "fast",
+      "decision": "needs_more_testing",
+      "notes": "First Fast candidate after 0.5B pipeline proof."
+    },
+    {
+      "modelId": "qwen-1_5b-think-candidate",
+      "fileName": "TBD user-provided GGUF",
+      "parameterClass": "1.5B",
+      "quantization": "Q4/IQ",
+      "fileSizeMb": null,
+      "configuredPath": "user-local path only",
+      "benchmarkElapsedMs": null,
+      "latencyClass": "unknown",
+      "tokenEstimate": null,
+      "coldStartObservation": "not tested",
+      "memoryObservationManual": "not tested",
+      "technicalAccuracyScore": null,
+      "instructionFollowingScore": null,
+      "crispnessScore": null,
+      "recommendedRoute": "think",
+      "decision": "needs_more_testing",
+      "notes": "Candidate for capable phone/laptop after benchmark and quality gates."
+    }
+  ]
+}
