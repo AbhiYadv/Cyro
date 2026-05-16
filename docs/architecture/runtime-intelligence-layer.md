@@ -39,6 +39,7 @@ Runtime Governor must consider sidecar status before selecting `local_sidecar`:
 - benchmark gate satisfied when required
 - sidecar process available
 - runtime state ready or loadable
+- generation state idle or otherwise able to accept work
 - thermal and battery gates passing
 
 If the sidecar binary is not configured, missing, non-executable, unsupported, unavailable, loading, generating, errored, or benchmark-blocked, Runtime Governor must return an explainable fallback such as `local_mock`, a lighter local configuration, defer, or user action required.
@@ -109,6 +110,7 @@ Inputs:
 - benchmark store data
 - local model evaluation matrix data
 - quality gate status
+- active `GenerationState`
 - user runtime settings
 - privacy and Local Only state
 - future trusted `NodeAvailability`
@@ -196,6 +198,42 @@ Policy:
 - `blocked_latency` prevents default route selection even when answer quality is acceptable.
 - `needs_more_testing` keeps the candidate visible as an experiment, not a production default.
 - `candidate_fast`, `candidate_think`, and `candidate_pro_later` require explicit benchmark and quality evidence.
+
+## Generation State and Cancellation Signals
+
+CYRO-0011A defines generation state and cancellation as Runtime Intelligence signals before streaming implementation.
+
+`GenerationState` values:
+- `idle`
+- `starting`
+- `streaming`
+- `cancelling`
+- `cancelled`
+- `completed`
+- `timed_out`
+- `failed`
+
+Runtime Governor rules:
+- `starting`, `streaming`, and `cancelling` mean one local generation is already active.
+- Runtime Governor must not start a new local generation while one is active.
+- A new prompt may start only after the active generation completes, cancels, times out, or fails and Rust clears active state.
+- Future queueing is out of scope until a separate contract defines fairness, cancellation priority, and UI behavior.
+- Cancel and timeout outcomes must become visible route/runtime signals, not hidden process failures.
+
+Runtime status should expose:
+- active generation id when present
+- active route
+- active model id
+- generation state
+- elapsed time
+- last finish reason
+- actionable cancel, timeout, or failure reason
+
+Cancellation and timeout policy:
+- cancel maps to `cancel_generation` and Rust-owned child process cleanup
+- timeout maps to Rust-owned child process termination
+- both clear generating state before another local generation can begin
+- partial output is not automatically written to memory
 
 ## Laptop Node Discovery Contract
 
