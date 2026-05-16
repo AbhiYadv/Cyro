@@ -104,6 +104,8 @@
 - [ ] React does not spawn, supervise, terminate, or directly control the sidecar process
 - [ ] Streaming uses Tauri events or an equivalent Rust-owned event channel
 - [ ] Tauri capabilities grant only `core:event:allow-listen` and `core:event:allow-unlisten` for the main window streaming listener; frontend event emit permissions remain blocked
+- [ ] Rust strips `llama-cli` banner, REPL prompt markers, available-command help, timing footer, and exit text before stdout reaches chat or benchmark UI
+- [ ] Empty-output diagnostics expose safe stdout shape counts and bounded prompt-redacted stderr, not raw prompt content
 - [ ] Streaming event payloads use `started`, `delta`, `completed`, `cancelled`, `timeout`, and `error`
 - [ ] Non-streaming prompt execution remains available as a fallback
 - [ ] Only one local generation can be active at a time

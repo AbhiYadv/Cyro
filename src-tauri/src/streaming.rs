@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::{
     llama_cli::{
-        build_llama_cli_args_for_request, cleanup_stdout, llama_cli_working_dir,
+        build_llama_cli_args_for_request, cleanup_stdout, empty_stdout_debug, llama_cli_working_dir,
         sanitize_debug_output, LlamaCliRequest, MAX_DEBUG_CHARS,
     },
     runtime_types::{FinishReason, GenerationState, RuntimeError, RuntimeMode, RuntimeRoute},
@@ -21,6 +21,7 @@ use crate::{
 
 pub const LOCAL_PROMPT_STREAM_EVENT: &str = "cyro://local-prompt-stream";
 const READ_BUFFER_BYTES: usize = 256;
+const STDOUT_DRAIN_IDLE_ROUNDS: usize = 20;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -335,6 +336,7 @@ where
     spawn_bounded_stderr_reader(stderr, request.prompt.clone(), Arc::clone(&stderr_buffer));
 
     let mut sequence = 0;
+    let mut emitted_stdout = String::new();
     emit(StreamEvent {
         generation_id: generation_id.clone(),
         event_type: StreamEventType::Started,
@@ -357,18 +359,16 @@ where
             }
 
             raw_stdout.push_str(&delta);
-            sequence += 1;
-            emit(StreamEvent {
-                generation_id: generation_id.clone(),
-                event_type: StreamEventType::Delta,
-                delta: Some(delta),
-                elapsed_ms: elapsed_ms(started_at),
-                model_id: model_id.clone(),
-                route: RuntimeRoute::LocalSidecar,
-                sequence,
-                finish_reason: None,
-                error: None,
-            });
+            emit_clean_stdout_delta(
+                &raw_stdout,
+                &request.prompt,
+                &mut emitted_stdout,
+                &mut sequence,
+                &mut emit,
+                &generation_id,
+                &model_id,
+                started_at,
+            );
         }
 
         if cancel_requested.load(Ordering::SeqCst) {
@@ -376,6 +376,8 @@ where
                 drain_stdout(
                     &stdout_rx,
                     &mut raw_stdout,
+                    &mut emitted_stdout,
+                    &request.prompt,
                     &mut sequence,
                     &mut emit,
                     &generation_id,
@@ -405,6 +407,8 @@ where
             drain_stdout(
                 &stdout_rx,
                 &mut raw_stdout,
+                &mut emitted_stdout,
+                &request.prompt,
                 &mut sequence,
                 &mut emit,
                 &generation_id,
@@ -428,6 +432,8 @@ where
             drain_stdout(
                 &stdout_rx,
                 &mut raw_stdout,
+                &mut emitted_stdout,
+                &request.prompt,
                 &mut sequence,
                 &mut emit,
                 &generation_id,
@@ -476,7 +482,11 @@ where
                     "sidecar_empty_response",
                     "The local llama.cpp sidecar returned no text.",
                     "Try a shorter prompt or a different validated GGUF model.",
-                    bounded_stderr_debug(&stderr_buffer, &request.prompt),
+                    Some(empty_stdout_debug(
+                        &raw_stdout,
+                        &stderr_buffer.lock().map(|value| value.clone()).unwrap_or_default(),
+                        &request.prompt,
+                    )),
                 );
                 return finish_error(
                     generation_manager,
@@ -704,6 +714,8 @@ fn spawn_bounded_stderr_reader(
 fn drain_stdout<F>(
     receiver: &mpsc::Receiver<String>,
     raw_stdout: &mut String,
+    emitted_stdout: &mut String,
+    prompt: &str,
     sequence: &mut u64,
     emit: &mut F,
     generation_id: &str,
@@ -712,25 +724,78 @@ fn drain_stdout<F>(
 ) where
     F: FnMut(StreamEvent),
 {
-    while let Ok(delta) = receiver.recv_timeout(Duration::from_millis(10)) {
-        if delta.is_empty() {
-            continue;
-        }
+    let mut idle_rounds = 0;
+    loop {
+        match receiver.recv_timeout(Duration::from_millis(10)) {
+            Ok(delta) => {
+                idle_rounds = 0;
+                if delta.is_empty() {
+                    continue;
+                }
 
-        raw_stdout.push_str(&delta);
-        *sequence += 1;
-        emit(StreamEvent {
-            generation_id: generation_id.to_string(),
-            event_type: StreamEventType::Delta,
-            delta: Some(delta),
-            elapsed_ms: elapsed_ms(started_at),
-            model_id: model_id.clone(),
-            route: RuntimeRoute::LocalSidecar,
-            sequence: *sequence,
-            finish_reason: None,
-            error: None,
-        });
+                raw_stdout.push_str(&delta);
+                emit_clean_stdout_delta(
+                    raw_stdout,
+                    prompt,
+                    emitted_stdout,
+                    sequence,
+                    emit,
+                    generation_id,
+                    model_id,
+                    started_at,
+                );
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                idle_rounds += 1;
+                if idle_rounds >= STDOUT_DRAIN_IDLE_ROUNDS {
+                    break;
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
     }
+}
+
+fn emit_clean_stdout_delta<F>(
+    raw_stdout: &str,
+    prompt: &str,
+    emitted_stdout: &mut String,
+    sequence: &mut u64,
+    emit: &mut F,
+    generation_id: &str,
+    model_id: &Option<String>,
+    started_at: Instant,
+) where
+    F: FnMut(StreamEvent),
+{
+    let cleaned = cleanup_stdout(raw_stdout, prompt);
+    if cleaned.is_empty() || cleaned == *emitted_stdout {
+        return;
+    }
+
+    let delta = if cleaned.starts_with(emitted_stdout.as_str()) {
+        cleaned[emitted_stdout.len()..].to_string()
+    } else {
+        cleaned.clone()
+    };
+
+    if delta.is_empty() {
+        return;
+    }
+
+    *emitted_stdout = cleaned;
+    *sequence += 1;
+    emit(StreamEvent {
+        generation_id: generation_id.to_string(),
+        event_type: StreamEventType::Delta,
+        delta: Some(delta),
+        elapsed_ms: elapsed_ms(started_at),
+        model_id: model_id.clone(),
+        route: RuntimeRoute::LocalSidecar,
+        sequence: *sequence,
+        finish_reason: None,
+        error: None,
+    });
 }
 
 fn child_has_exited(child: &Arc<Mutex<Child>>) -> Result<bool, RuntimeError> {
@@ -859,6 +924,44 @@ mod tests {
             events.last().unwrap().event_type,
             StreamEventType::Completed
         );
+    }
+
+    #[test]
+    fn streaming_deltas_filter_llama_cli_decorations() {
+        let prompt = "Say hello in one sentence.";
+        let sandbox = TestSandbox::new("decorated");
+        let script = format!(
+            "#!/bin/sh\nprintf '%s\\n' 'Loading model...' '' 'build      : b9162-d52844458' 'model      : qwen2.5-0.5b-instruct-q4_k_m.gguf' 'modalities : text' '' 'available commands:' '  /exit or Ctrl+C     stop or exit' '  /regen              regenerate the last response' '  /clear              clear the chat history' '' '> {prompt}' '' '> Hello from local sidecar.' '' '[ Prompt: 1.0 t/s | Generation: 2.0 t/s ]' '>' 'Exiting...'\n"
+        );
+        let binary = sandbox.write_executable("llama-cli", &script);
+        let manager = GenerationManager::default();
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let events_for_run = Arc::clone(&events);
+        let request = request_for(&binary, prompt, Duration::from_secs(2));
+
+        let result = run_streaming_llama_cli_prompt(
+            &request,
+            RuntimeMode::Fast,
+            Some("qwen-0_8b-local".to_string()),
+            &manager,
+            |event| events_for_run.lock().unwrap().push(event),
+        )
+        .expect("decorated streaming prompt should complete");
+
+        let delta_text = events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|event| event.delta.as_deref())
+            .collect::<String>();
+
+        assert_eq!(result.final_text, "Hello from local sidecar.");
+        assert_eq!(delta_text, "Hello from local sidecar.");
+        assert!(!delta_text.contains("Loading model"));
+        assert!(!delta_text.contains("available commands"));
+        assert!(!delta_text.contains(prompt));
+        assert!(!delta_text.contains("[ Prompt:"));
+        assert!(!delta_text.contains("Exiting"));
     }
 
     #[test]

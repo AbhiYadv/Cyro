@@ -663,11 +663,17 @@ Streaming behavior:
 - Rust spawns `llama-cli` with structured one-shot `-m <model> -p <prompt> -n <maxTokens> --single-turn` args.
 - Rust sets the child working directory to the validated sidecar binary parent and closes stdin.
 - If `CYRO_LLAMA_CLI_CPU_FALLBACK=1` is set for development validation, Rust appends `--device none`; this is not a product default.
-- Rust reads stdout incrementally and emits ordered `delta` events.
+- Rust reads stdout incrementally, removes `llama-cli` banner/REPL/timing decoration, and emits ordered cleaned `delta` events.
 - React subscribes to stream events and appends deltas to the active assistant message.
 - The final result replaces the partial message with cleaned stdout.
 - Non-streaming `send_local_prompt` remains available as a fallback path.
 - `local_mock` fallback remains available when no sidecar and no model path are configured.
+
+Output cleanup behavior:
+- remove llama.cpp banner, ASCII logo, metadata, available-command help, prompt shell markers, timing footer, and `Exiting...`
+- preserve generated assistant answer text, including answer text that appears after a `>` REPL marker
+- benchmark responses use the same cleanup helper before token-rate estimation and never surface raw `llama-cli` shell text as benchmark output
+- if cleanup leaves no assistant text, diagnostics report safe stdout shape counts and bounded prompt-redacted stderr, not raw prompt content
 
 Cancel behavior:
 - only one active local generation is allowed
