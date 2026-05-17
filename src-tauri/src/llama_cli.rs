@@ -1,7 +1,8 @@
 use std::{
+    io::Read,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
-    sync::Mutex,
+    process::{Command, ExitStatus, Stdio},
+    sync::{mpsc, Mutex},
     thread,
     time::{Duration, Instant},
 };
@@ -136,11 +137,14 @@ impl LlamaCliRequest {
         }
     }
 
-    fn launch_fingerprint(&self) -> String {
+    fn launch_fingerprint(&self, working_dir: Option<&Path>) -> String {
         format!(
-            "backendMode={}; cpuFallbackApplied={}; argFingerprint=modelPathConfigured:true,promptRedacted:true,maxTokens:{},singleTurn:true,deviceNone:{}",
+            "backendMode={}; cpuFallbackApplied={}; workingDir={}; argFingerprint=modelPathConfigured:true,promptRedacted:true,maxTokens:{},singleTurn:true,deviceNone:{}",
             self.backend_mode.as_str(),
             self.backend_mode.cpu_fallback_applied(),
+            working_dir
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "[not set]".to_string()),
             self.max_tokens,
             self.backend_mode.cpu_fallback_applied()
         )
@@ -179,9 +183,58 @@ pub(crate) fn llama_cli_working_dir(binary_path: &str) -> Option<PathBuf> {
 
 pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput, RuntimeError> {
     let started_at = Instant::now();
-    let args = build_llama_cli_args_for_request(request);
     let working_dir = llama_cli_working_dir(&request.binary_path);
+    let output = capture_llama_cli_output(request, working_dir.as_deref(), started_at)?;
+    let elapsed_ms = elapsed_ms(started_at);
 
+    if !output.status.success() {
+        return Err(RuntimeError::recoverable(
+            "sidecar_exit_failed",
+            "The local llama.cpp sidecar exited with an error.",
+            "Check the configured model path and try a shorter local prompt.",
+            Some(format!(
+                "exitStatus={}; elapsedMs={elapsed_ms}; {}; {}",
+                output.status,
+                request.launch_fingerprint(working_dir.as_deref()),
+                empty_stdout_debug(&output.stdout, &output.stderr, &request.prompt)
+            )),
+        ));
+    }
+
+    let response = cleanup_stdout(&output.stdout, &request.prompt);
+    if response.is_empty() {
+        return Err(RuntimeError::recoverable(
+            "sidecar_empty_output",
+            "The local llama.cpp sidecar returned no text.",
+            "Try a shorter prompt or a different validated GGUF model.",
+            Some(format!(
+                "exitStatus={}; elapsedMs={elapsed_ms}; {}; {}",
+                output.status,
+                request.launch_fingerprint(working_dir.as_deref()),
+                empty_stdout_debug(&output.stdout, &output.stderr, &request.prompt)
+            )),
+        ));
+    }
+
+    Ok(LlamaCliOutput {
+        response,
+        elapsed_ms,
+        finish_reason: FinishReason::Completed,
+    })
+}
+
+struct CapturedLlamaCliOutput {
+    status: ExitStatus,
+    stdout: String,
+    stderr: String,
+}
+
+fn capture_llama_cli_output(
+    request: &LlamaCliRequest,
+    working_dir: Option<&Path>,
+    started_at: Instant,
+) -> Result<CapturedLlamaCliOutput, RuntimeError> {
+    let args = build_llama_cli_args_for_request(request);
     let mut command = Command::new(&request.binary_path);
     if let Some(working_dir) = working_dir {
         command.current_dir(working_dir);
@@ -202,66 +255,103 @@ pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput,
             )
         })?;
 
-    loop {
-        if child.try_wait().map_err(runtime_wait_error)?.is_some() {
-            let output = child.wait_with_output().map_err(runtime_wait_error)?;
-            let elapsed_ms = elapsed_ms(started_at);
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(RuntimeError::recoverable(
+                "sidecar_stdout_unavailable",
+                "Cyro could not open the sidecar stdout stream.",
+                "Retry the prompt after confirming the llama-cli path is valid.",
+                Some(request.launch_fingerprint(working_dir)),
+            ));
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(stderr) => stderr,
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(RuntimeError::recoverable(
+                "sidecar_stderr_unavailable",
+                "Cyro could not open the sidecar stderr stream.",
+                "Retry the prompt after confirming the llama-cli path is valid.",
+                Some(request.launch_fingerprint(working_dir)),
+            ));
+        }
+    };
 
-            if !output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(RuntimeError::recoverable(
-                    "sidecar_exit_failed",
-                    "The local llama.cpp sidecar exited with an error.",
-                    "Check the configured model path and try a shorter local prompt.",
-                    Some(format!(
-                        "exitStatus={}; elapsedMs={elapsed_ms}; {}; {}",
-                        output.status,
-                        request.launch_fingerprint(),
-                        empty_stdout_debug(&stdout, &stderr, &request.prompt)
-                    )),
-                ));
-            }
+    let stdout_rx = spawn_capture_reader(stdout);
+    let stderr_rx = spawn_capture_reader(stderr);
 
-            let response =
-                cleanup_stdout(&String::from_utf8_lossy(&output.stdout), &request.prompt);
-            if response.is_empty() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(RuntimeError::recoverable(
-                    "sidecar_empty_output",
-                    "The local llama.cpp sidecar returned no text.",
-                    "Try a shorter prompt or a different validated GGUF model.",
-                    Some(format!(
-                        "exitStatus={}; elapsedMs={elapsed_ms}; {}; {}",
-                        output.status,
-                        request.launch_fingerprint(),
-                        empty_stdout_debug(&stdout, &stderr, &request.prompt)
-                    )),
-                ));
-            }
-
-            return Ok(LlamaCliOutput {
-                response,
-                elapsed_ms,
-                finish_reason: FinishReason::Completed,
-            });
+    let status = loop {
+        if let Some(status) = child.try_wait().map_err(runtime_wait_error)? {
+            break status;
         }
 
         if started_at.elapsed() >= request.timeout {
             let _ = child.kill();
             let _ = child.wait();
+            let _ = collect_capture_reader(stdout_rx);
+            let _ = collect_capture_reader(stderr_rx);
 
             return Err(RuntimeError::recoverable(
                 "sidecar_timeout",
                 "The local llama.cpp sidecar timed out.",
                 "Try a shorter prompt or lower token limit.",
-                Some(format!("timeoutMs={}", request.timeout.as_millis())),
+                Some(format!(
+                    "timeoutMs={}; {}",
+                    request.timeout.as_millis(),
+                    request.launch_fingerprint(working_dir)
+                )),
             ));
         }
 
         thread::sleep(Duration::from_millis(25));
-    }
+    };
+
+    let _ = child.wait().map_err(runtime_wait_error)?;
+    let stdout = collect_capture_reader(stdout_rx)?;
+    let stderr = collect_capture_reader(stderr_rx)?;
+
+    Ok(CapturedLlamaCliOutput {
+        status,
+        stdout,
+        stderr,
+    })
+}
+
+fn spawn_capture_reader(mut stream: impl Read + Send + 'static) -> mpsc::Receiver<Vec<u8>> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let mut buffer = Vec::new();
+        let mut chunk = [0_u8; 1024];
+        loop {
+            match stream.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(bytes_read) => buffer.extend_from_slice(&chunk[..bytes_read]),
+                Err(_) => break,
+            }
+        }
+        let _ = sender.send(buffer);
+    });
+    receiver
+}
+
+fn collect_capture_reader(receiver: mpsc::Receiver<Vec<u8>>) -> Result<String, RuntimeError> {
+    let bytes = receiver
+        .recv_timeout(Duration::from_secs(2))
+        .map_err(|error| {
+            RuntimeError::recoverable(
+                "sidecar_capture_failed",
+                "Cyro could not capture the local sidecar output.",
+                "Retry after confirming the sidecar path is valid.",
+                Some(error.to_string()),
+            )
+        })?;
+
+    Ok(String::from_utf8_lossy(&bytes).to_string())
 }
 
 fn runtime_wait_error(error: std::io::Error) -> RuntimeError {
@@ -601,7 +691,8 @@ pub(crate) fn dev_cpu_fallback_enabled() -> bool {
 mod tests {
     use super::{
         build_llama_cli_args, build_llama_cli_args_for_request, llama_cli_working_dir,
-        run_llama_cli_prompt, sanitize_max_tokens, LlamaCliRequest, RuntimeBackendMode,
+        run_llama_cli_prompt, sanitize_max_tokens, FinishReason, LlamaCliRequest,
+        RuntimeBackendMode,
     };
     use std::{
         fs,
@@ -854,6 +945,28 @@ Exiting...
         assert!(debug.contains("stdoutShape=bytes:0"));
         assert!(debug.contains("stderrShape=bytes:0"));
         assert!(!debug.contains("private prompt"));
+    }
+
+    #[test]
+    fn direct_capture_collects_stdout_from_successful_child() {
+        let sandbox = TestSandbox::new("direct_capture");
+        let binary = sandbox.write_executable(
+            "llama-cli",
+            "#!/bin/sh\nprintf 'private prompt\\n'\nprintf 'captured answer from sidecar\\n'\nprintf 'stderr diagnostic' >&2\nexit 0\n",
+        );
+        let request = LlamaCliRequest {
+            binary_path: path_str(&binary).to_string(),
+            model_path: "/tmp/model.gguf".to_string(),
+            prompt: "private prompt".to_string(),
+            max_tokens: 8,
+            timeout: Duration::from_secs(5),
+            backend_mode: RuntimeBackendMode::Auto,
+        };
+
+        let output = run_llama_cli_prompt(&request).expect("stdout should be captured");
+
+        assert_eq!(output.response, "captured answer from sidecar");
+        assert_eq!(output.finish_reason, FinishReason::Completed);
     }
 
     #[test]
