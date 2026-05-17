@@ -23,6 +23,11 @@
 | CYRO-0011B-OUTPUT-PARSE-FIX | llama-cli output parsing cleanup | task/CYRO-0011B-streaming-cancel-implementation | Ready for Review |  | 2026-05-16 | Cleans `llama-cli` banner, REPL prompt markers, available-command help, timing footer, and exit text before chat/benchmark output; empty-output diagnostics use safe shape counts |
 | CYRO-0011B-CANCEL-VALIDATION-HOOK | Dev-only cancel validation hook | task/CYRO-0011B-streaming-cancel-implementation | Ready for Review |  | 2026-05-17 | Adds explicit `CYRO_STREAM_TEST_SLOW=1` native dev validation mode without slowing normal runtime; not accepted as deterministic manual Cancel proof because the 0.5B model can still finish too quickly |
 | CYRO-0011C | Deterministic Cancel Validation Harness | task/CYRO-0011C-deterministic-cancel-harness | Planned |  | 2026-05-17 | Add an explicit dev-only fake/local streaming source that emits deterministic slow chunks so Stop/Cancel can be manually validated; unavailable in production; no model files, cloud/provider APIs, llama-server, downloads, or binaries |
+| CYRO-MODEL-001 | Qwen vs MiniCPM Ranking Policy | task/CYRO-MODEL-001-qwen-minicpm-benchmark-plan | Ready for Review |  | 2026-05-17 | Docs/evaluation policy only; adds MiniCPM/MiniCPM-V as formal candidates and defines evidence-based weighted ranking with no winner claimed |
+| CYRO-MODEL-002 | Qwen Candidate Test Run | Backlog | Planned |  |  | Run local benchmark and fixed quality prompts for Qwen 0.8B, 1.5B, and 3B candidates using user-provided GGUF files only |
+| CYRO-MODEL-003 | MiniCPM Candidate Test Run | Backlog | Planned |  |  | Run the same benchmark and fixed quality prompts for MiniCPM/MiniCPM-V candidates using user-provided GGUF files only |
+| CYRO-MODEL-004 | Ranking Decision Review | Backlog | Planned |  |  | Compare Qwen and MiniCPM evidence using quality, latency, instruction-following, resource, and stability weights before route promotion |
+| CYRO-MODEL-005 | Promote Primary Local Model Candidate | Backlog | Planned |  |  | Promote primary Fast/Think candidate only after benchmark plus quality gates pass; no model download or runtime switching implementation implied |
 | CYRO-0012 | Crisp Answer Protocol | Phase 1B | Planned |  |  | Defines prompt/runtime answer protocol for concise local answers after runtime proof and benchmark gating |
 | CYRO-0013 | Context Capsule Builder ADR | Phase 3 - Ghost Tree Memory | Planned |  |  | Defines selected memory slice injection before full Ghost Tree implementation; aligns with CYRO-MEMORY-001 |
 | CYRO-PROVIDER-002 | Isolated Provider Session Container Design | Backlog | Planned |  |  | Documents isolated webview/session boundaries without storing provider credentials |
@@ -88,5 +93,7 @@ Model selection requires benchmark plus quality evidence:
 - 0.8B or nearest small Qwen instruct GGUF: Fast candidate to evaluate
 - 1.5B Q4/IQ: Think candidate for capable phone/laptop
 - 3B Q4/IQ: future laptop/Pro candidate, benchmark-gated later
+- MiniCPM: edge-efficient Fast/Think challenger candidate to evaluate
+- MiniCPM-V: future multimodal/document candidate to evaluate after local GGUF and document harness validation
 
-Quality prompts are documented in `docs/architecture/local-model-evaluation.md`. Fast/Think/Pro require benchmark and quality evidence before default model selection.
+Quality prompts are documented in `docs/architecture/local-model-evaluation.md`. Fast/Think/Pro require benchmark and quality evidence before default model selection. Best measured model becomes primary; Qwen and MiniCPM compete under the same weighted ranking matrix, and no winner is selected yet.
