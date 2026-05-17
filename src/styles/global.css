@@ -321,6 +321,23 @@ textarea:disabled {
   text-transform: none;
 }
 
+.message-cancel-button {
+  display: block;
+  margin-top: 0.75rem;
+  border: 1px solid rgba(251, 113, 133, 0.48);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  background: rgba(251, 113, 133, 0.14);
+  color: #fecdd3;
+  font-weight: 900;
+}
+
+.message-cancel-button:disabled,
+.composer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .error-banner {
   margin-top: 0.85rem;
   border: 1px solid rgba(251, 113, 133, 0.4);

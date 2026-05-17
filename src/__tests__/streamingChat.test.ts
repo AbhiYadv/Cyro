@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   applyStreamingResultToMessage,
   applyStreamEventToMessage,
+  cancelButtonLabel,
   finishReasonStatusLabel,
+  isCancelDisabledWhileGenerating,
   isCancelVisibleWhileGenerating,
+  isGenerationActive,
   isSendDisabledWhileGenerating,
   streamingErrorText
 } from "../services/streamingChat";
@@ -96,5 +99,19 @@ describe("streaming chat message reducer", () => {
     expect(isCancelVisibleWhileGenerating(true)).toBe(true);
     expect(isSendDisabledWhileGenerating(false)).toBe(false);
     expect(isCancelVisibleWhileGenerating(false)).toBe(false);
+    expect(isGenerationActive("streaming")).toBe(true);
+    expect(isSendDisabledWhileGenerating("streaming")).toBe(true);
+    expect(isCancelVisibleWhileGenerating("streaming")).toBe(true);
+    expect(isCancelDisabledWhileGenerating("streaming")).toBe(false);
+    expect(cancelButtonLabel("streaming")).toBe("Stop");
+  });
+
+  it("keeps cancel visible but disabled once cancellation is in progress", () => {
+    expect(isGenerationActive("cancelling")).toBe(true);
+    expect(isSendDisabledWhileGenerating("cancelling")).toBe(true);
+    expect(isCancelVisibleWhileGenerating("cancelling")).toBe(true);
+    expect(isCancelDisabledWhileGenerating("cancelling")).toBe(true);
+    expect(cancelButtonLabel("cancelling")).toBe("Cancelling");
+    expect(isGenerationActive("cancelled")).toBe(false);
   });
 });

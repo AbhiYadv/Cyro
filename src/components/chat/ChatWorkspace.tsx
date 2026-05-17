@@ -3,14 +3,16 @@ import { routeLabel } from "../../services/runtimeStatus";
 import {
   applyStreamingResultToMessage,
   applyStreamEventToMessage,
+  cancelButtonLabel,
   finishReasonStatusLabel,
+  isCancelDisabledWhileGenerating,
   isCancelVisibleWhileGenerating,
   isSendDisabledWhileGenerating,
   streamingErrorText
 } from "../../services/streamingChat";
 import { cancelGeneration, formatRuntimeError, sendLocalPromptStreaming } from "../../services/tauriClient";
 import type { ChatMessage } from "../../types/chat";
-import type { RuntimeMode } from "../../types/runtime";
+import type { GenerationState, RuntimeMode } from "../../types/runtime";
 
 type ChatWorkspaceProps = {
   mode: RuntimeMode;
@@ -52,6 +54,8 @@ export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWork
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeGenerationId, setActiveGenerationId] = useState<string | null>(null);
+  const [activeAssistantMessageId, setActiveAssistantMessageId] = useState<string | null>(null);
+  const [activeGenerationState, setActiveGenerationState] = useState<GenerationState>("idle");
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -70,6 +74,7 @@ export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWork
 
     setError(null);
     setIsLoading(true);
+    setActiveGenerationState("starting");
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -88,16 +93,31 @@ export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWork
     };
 
     setMessages((current) => [...current, userMessage, assistantMessage]);
+    setActiveAssistantMessageId(assistantMessageId);
     setPrompt("");
 
     try {
       const result = await sendLocalPromptStreaming(trimmedPrompt, mode, (event) => {
         if (event.eventType === "started") {
           setActiveGenerationId(event.generationId);
+          setActiveGenerationState("streaming");
           void onPromptComplete?.();
         }
 
+        if (event.eventType === "delta") {
+          setActiveGenerationState("streaming");
+        }
+
         if (event.eventType === "completed" || event.eventType === "cancelled" || event.eventType === "timeout" || event.eventType === "error") {
+          const finalState: GenerationState =
+            event.eventType === "completed"
+              ? "completed"
+              : event.eventType === "cancelled"
+                ? "cancelled"
+                : event.eventType === "timeout"
+                  ? "timed_out"
+                  : "failed";
+          setActiveGenerationState(finalState);
           void onPromptComplete?.();
         }
 
@@ -125,18 +145,28 @@ export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWork
         // Runtime status refresh is secondary to the prompt result.
       }
       setActiveGenerationId(null);
+      setActiveAssistantMessageId(null);
+      setActiveGenerationState("idle");
       setIsLoading(false);
     }
   }
 
   async function handleCancel() {
-    if (!activeGenerationId) {
-      return;
-    }
-
     try {
+      setActiveGenerationState("cancelling");
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === activeAssistantMessageId ? { ...message, generationState: "cancelling" } : message
+        )
+      );
       await cancelGeneration(activeGenerationId);
     } catch (caughtError) {
+      setActiveGenerationState("streaming");
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === activeAssistantMessageId ? { ...message, generationState: "streaming" } : message
+        )
+      );
       setError(formatRuntimeError(caughtError, "Cancel failed."));
     }
   }
@@ -166,11 +196,22 @@ export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWork
         {messages.map((message) => (
           <article className={`message-bubble ${message.role}`} key={message.id}>
             <span className="message-role">{message.role === "user" ? "You" : "Cyro"}</span>
-            <p>{message.body || (message.generationState === "starting" ? "Starting local generation..." : "")}</p>
+            <p>{message.body || (message.generationState === "starting" ? "Starting local generation..." : message.generationState === "cancelling" ? "Cancelling local generation..." : "")}</p>
             {message.role === "assistant" ? <span className="route-label">{messageMetadata(message)}</span> : null}
             {finishReasonStatusLabel(message.finishReason) ? <span className="finish-label">{finishReasonStatusLabel(message.finishReason)}</span> : null}
             {streamingErrorText(message) ? <span className="message-error">{streamingErrorText(message)}</span> : null}
             {message.mocked ? <span className="mock-label">Mocked</span> : null}
+            {message.id === activeAssistantMessageId && isCancelVisibleWhileGenerating(activeGenerationState) ? (
+              <button
+                aria-label="Stop local generation"
+                className="message-cancel-button"
+                disabled={isCancelDisabledWhileGenerating(activeGenerationState)}
+                type="button"
+                onClick={handleCancel}
+              >
+                {cancelButtonLabel(activeGenerationState)}
+              </button>
+            ) : null}
           </article>
         ))}
       </div>
@@ -187,15 +228,21 @@ export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWork
           placeholder="Ask the local brain..."
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          disabled={isSendDisabledWhileGenerating(isLoading)}
+          disabled={isSendDisabledWhileGenerating(activeGenerationState) || isLoading}
           rows={3}
         />
-        <button type="submit" disabled={isSendDisabledWhileGenerating(isLoading)}>
+        <button type="submit" disabled={isSendDisabledWhileGenerating(activeGenerationState) || isLoading}>
           {isLoading ? "Sending" : "Send"}
         </button>
-        {isCancelVisibleWhileGenerating(isLoading) ? (
-          <button className="cancel-button" type="button" onClick={handleCancel} disabled={!activeGenerationId}>
-            Cancel
+        {isCancelVisibleWhileGenerating(activeGenerationState) ? (
+          <button
+            aria-label="Stop local generation"
+            className="cancel-button"
+            type="button"
+            onClick={handleCancel}
+            disabled={isCancelDisabledWhileGenerating(activeGenerationState)}
+          >
+            {cancelButtonLabel(activeGenerationState)}
           </button>
         ) : null}
       </form>

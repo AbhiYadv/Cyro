@@ -1,6 +1,6 @@
 import { formatRuntimeError } from "./tauriClient";
 import type { ChatMessage } from "../types/chat";
-import type { FinishReason, LocalPromptStreamEvent, StreamingPromptResult } from "../types/runtime";
+import type { FinishReason, GenerationState, LocalPromptStreamEvent, StreamingPromptResult } from "../types/runtime";
 
 export function applyStreamEventToMessage(message: ChatMessage, event: LocalPromptStreamEvent): ChatMessage {
   const next: ChatMessage = {
@@ -79,12 +79,28 @@ export function streamingErrorText(message: ChatMessage) {
   return formatRuntimeError(message.runtimeError);
 }
 
-export function isSendDisabledWhileGenerating(isGenerating: boolean) {
-  return isGenerating;
+export function isGenerationActive(generationState: GenerationState | boolean | null | undefined) {
+  if (typeof generationState === "boolean") {
+    return generationState;
+  }
+
+  return generationState === "starting" || generationState === "streaming" || generationState === "cancelling";
 }
 
-export function isCancelVisibleWhileGenerating(isGenerating: boolean) {
-  return isGenerating;
+export function isSendDisabledWhileGenerating(generationState: GenerationState | boolean | null | undefined) {
+  return isGenerationActive(generationState);
+}
+
+export function isCancelVisibleWhileGenerating(generationState: GenerationState | boolean | null | undefined) {
+  return isGenerationActive(generationState);
+}
+
+export function isCancelDisabledWhileGenerating(generationState: GenerationState | boolean | null | undefined) {
+  return generationState === "cancelling";
+}
+
+export function cancelButtonLabel(generationState: GenerationState | boolean | null | undefined) {
+  return generationState === "cancelling" ? "Cancelling" : "Stop";
 }
 
 function generationStateForFinishReason(reason: FinishReason): ChatMessage["generationState"] {
