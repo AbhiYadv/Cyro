@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { placeholderModelRegistry } from "./modelRegistry";
 import { mockedSidecarStatus } from "./sidecar";
+import type { ProviderId, ProviderSessionDescriptor } from "../types/provider";
 import type {
   CancelGenerationResponse,
   HealthCheck,
@@ -124,7 +125,32 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
     return (args?.mode ?? "auto") as T;
   }
 
+  if (command === "get_provider_session") {
+    const providerId = args?.providerId;
+    if (providerId === "chatgpt") {
+      return mockedProviderSession("chatgpt", "ChatGPT", "https://chatgpt.com") as T;
+    }
+    if (providerId === "claude") {
+      return mockedProviderSession("claude", "Claude", "https://claude.ai") as T;
+    }
+    if (providerId === "gemini") {
+      return mockedProviderSession("gemini", "Gemini", "https://gemini.google.com") as T;
+    }
+    throw new Error("This provider route is not allowlisted.");
+  }
+
   throw new Error(`Unknown Sprint 0 command: ${command}`);
+}
+
+function mockedProviderSession(providerId: ProviderId, displayName: string, origin: string): ProviderSessionDescriptor {
+  return {
+    providerId,
+    displayName,
+    origin,
+    providerOwnedLabel: "Provider-owned content. Cyro does not read provider DOM, responses, cookies, tokens, or credentials.",
+    fallbackAllowed: true,
+    blockedMessage: "If this provider refuses to load inside Cyro, use the explicit fallback link. Do not bypass provider protections."
+  };
 }
 
 const defaultInvoker: TauriInvoker = async <T>(command: string, args?: CommandArgs) => {
@@ -202,6 +228,10 @@ export async function runRuntimeBenchmark(mode: RuntimeMode, invoker: TauriInvok
 
 export async function setRuntimeBackendMode(mode: RuntimeBackendMode, invoker: TauriInvoker = defaultInvoker) {
   return invoker<RuntimeBackendMode>("set_runtime_backend_mode", { mode });
+}
+
+export async function getProviderSession(providerId: ProviderId, invoker: TauriInvoker = defaultInvoker) {
+  return invoker<ProviderSessionDescriptor>("get_provider_session", { providerId });
 }
 
 export function formatRuntimeError(error: unknown, fallback = "The local runtime command failed.") {

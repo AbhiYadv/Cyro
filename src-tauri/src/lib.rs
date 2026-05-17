@@ -3,6 +3,7 @@ use serde::Serialize;
 mod benchmark;
 mod llama_cli;
 mod model_registry;
+mod provider_session;
 mod runtime_types;
 mod sidecar;
 mod streaming;
@@ -486,6 +487,7 @@ pub fn run() {
             sidecar::validate_sidecar_path,
             llama_cli::set_runtime_backend_mode,
             benchmark::run_runtime_benchmark,
+            provider_session::get_provider_session,
             send_local_prompt,
             send_local_prompt_streaming,
             streaming::cancel_generation

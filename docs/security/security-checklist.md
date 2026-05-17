@@ -26,6 +26,16 @@
 - [ ] Sensitive prompt warning offers redact, send as-is, or Local Only
 - [ ] User consent is required before provider send
 
+## Embedded Provider Surface
+- [ ] Frontend passes provider id only, never arbitrary provider URLs
+- [ ] Rust/Tauri maps provider ids to hardcoded allowlisted origins
+- [ ] Unknown provider ids and arbitrary URLs are rejected
+- [ ] Provider-owned content is visibly labeled inside Cyro
+- [ ] Provider blocked/blank states use explicit fallback only and no bypass attempts
+- [ ] No provider cookies, tokens, credentials, DOM, or response content are exposed to React
+- [ ] No automated login, prompt injection, auto-send, response capture, or hidden provider activity is added
+- [ ] Provider response import and memory writes remain separate, explicit, user-triggered future tasks
+
 ## Memory Boundary
 - [ ] No silent memory updates
 - [ ] Provider imports create candidates only

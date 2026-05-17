@@ -10,7 +10,7 @@ Provider sessions must let the user access their own provider account from a Cyr
 
 CYRO-SPIKE-0004 uses external-browser fallback for ChatGPT, Claude, and Gemini. That fallback is safe and explicit, but it does not provide the final embedded Cyro experience.
 
-No embedded provider session is implemented.
+CYRO-PROVIDER-008 adds a feasibility shell inside the Cyro workspace. It maps provider ids to hardcoded allowlisted origins through Rust/Tauri, then renders a visible provider-owned surface for ChatGPT, Claude, or Gemini. This is a prototype and does not prove product success until manual login/chat behavior is validated per provider.
 
 External browser fallback is temporary and only used when embedded provider session is unavailable, blocked, or not yet implemented.
 
@@ -35,6 +35,27 @@ Provider origins:
 - Gemini: `https://gemini.google.com`
 
 Frontend must pass provider id only. It must not pass arbitrary URLs.
+
+## CYRO-PROVIDER-008 Feasibility Prototype
+
+The prototype tests whether the following provider origins can appear inside Cyro's visible workspace:
+- `chatgpt` -> `https://chatgpt.com`
+- `claude` -> `https://claude.ai`
+- `gemini` -> `https://gemini.google.com`
+
+Security boundary:
+- React passes provider id only.
+- Rust/Tauri resolves provider id to the hardcoded allowlisted origin.
+- Unknown provider ids and arbitrary URLs are rejected.
+- Provider cookies, credentials, DOM, and response content are not exposed to React.
+- Cyro does not automate login, prompt sending, response reading, import, or memory writes.
+
+Blocked behavior:
+- Providers may refuse embedded display with CSP, frame, login, or account security restrictions.
+- The shell must show a blocked/fallback state instead of attempting a bypass.
+- External browser fallback remains explicit and user-triggered only when embedding is unavailable or blocked.
+
+Manual feasibility findings are not complete until ChatGPT, Claude, and Gemini are each tested in the native app for visible load, manual login, typing/chat usability, and degraded or blocked behavior.
 
 ## Session Isolation Questions
 
