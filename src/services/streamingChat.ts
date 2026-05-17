@@ -87,12 +87,29 @@ export function isGenerationActive(generationState: GenerationState | boolean | 
   return generationState === "starting" || generationState === "streaming" || generationState === "cancelling";
 }
 
-export function isSendDisabledWhileGenerating(generationState: GenerationState | boolean | null | undefined) {
-  return isGenerationActive(generationState);
+export function hasActiveGenerationId(activeGenerationId: string | null | undefined) {
+  return typeof activeGenerationId === "string" && activeGenerationId.length > 0;
 }
 
-export function isCancelVisibleWhileGenerating(generationState: GenerationState | boolean | null | undefined) {
-  return isGenerationActive(generationState);
+export function isGenerationControlActive(
+  generationState: GenerationState | boolean | null | undefined,
+  activeGenerationId?: string | null
+) {
+  return isGenerationActive(generationState) || hasActiveGenerationId(activeGenerationId);
+}
+
+export function isSendDisabledWhileGenerating(
+  generationState: GenerationState | boolean | null | undefined,
+  activeGenerationId?: string | null
+) {
+  return isGenerationControlActive(generationState, activeGenerationId);
+}
+
+export function isCancelVisibleWhileGenerating(
+  generationState: GenerationState | boolean | null | undefined,
+  activeGenerationId?: string | null
+) {
+  return isGenerationControlActive(generationState, activeGenerationId);
 }
 
 export function isCancelDisabledWhileGenerating(generationState: GenerationState | boolean | null | undefined) {

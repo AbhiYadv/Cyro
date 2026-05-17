@@ -1,11 +1,12 @@
 import { FormEvent, useState } from "react";
-import { routeLabel } from "../../services/runtimeStatus";
+import { generationStateLabel, routeLabel } from "../../services/runtimeStatus";
 import {
   applyStreamingResultToMessage,
   applyStreamEventToMessage,
   cancelButtonLabel,
   finishReasonStatusLabel,
   isCancelDisabledWhileGenerating,
+  isGenerationControlActive,
   isCancelVisibleWhileGenerating,
   isSendDisabledWhileGenerating,
   streamingErrorText
@@ -57,6 +58,10 @@ export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWork
   const [activeAssistantMessageId, setActiveAssistantMessageId] = useState<string | null>(null);
   const [activeGenerationState, setActiveGenerationState] = useState<GenerationState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const generationControlActive = isGenerationControlActive(activeGenerationState, activeGenerationId);
+  const sendDisabled = isSendDisabledWhileGenerating(activeGenerationState, activeGenerationId) || isLoading;
+  const cancelVisible = isCancelVisibleWhileGenerating(activeGenerationState, activeGenerationId);
+  const cancelDisabled = isCancelDisabledWhileGenerating(activeGenerationState);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -201,11 +206,11 @@ export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWork
             {finishReasonStatusLabel(message.finishReason) ? <span className="finish-label">{finishReasonStatusLabel(message.finishReason)}</span> : null}
             {streamingErrorText(message) ? <span className="message-error">{streamingErrorText(message)}</span> : null}
             {message.mocked ? <span className="mock-label">Mocked</span> : null}
-            {message.id === activeAssistantMessageId && isCancelVisibleWhileGenerating(activeGenerationState) ? (
+            {message.id === activeAssistantMessageId && cancelVisible ? (
               <button
                 aria-label="Stop local generation"
                 className="message-cancel-button"
-                disabled={isCancelDisabledWhileGenerating(activeGenerationState)}
+                disabled={cancelDisabled}
                 type="button"
                 onClick={handleCancel}
               >
@@ -228,22 +233,27 @@ export function ChatWorkspace({ mode, onModeChange, onPromptComplete }: ChatWork
           placeholder="Ask the local brain..."
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          disabled={isSendDisabledWhileGenerating(activeGenerationState) || isLoading}
+          disabled={sendDisabled}
           rows={3}
         />
-        <button type="submit" disabled={isSendDisabledWhileGenerating(activeGenerationState) || isLoading}>
+        <button type="submit" disabled={sendDisabled}>
           {isLoading ? "Sending" : "Send"}
         </button>
-        {isCancelVisibleWhileGenerating(activeGenerationState) ? (
+        {cancelVisible ? (
           <button
             aria-label="Stop local generation"
             className="cancel-button"
             type="button"
             onClick={handleCancel}
-            disabled={isCancelDisabledWhileGenerating(activeGenerationState)}
+            disabled={cancelDisabled}
           >
             {cancelButtonLabel(activeGenerationState)}
           </button>
+        ) : null}
+        {generationControlActive ? (
+          <span className="generation-state-label" role="status">
+            Generation: {generationStateLabel(activeGenerationState)}
+          </span>
         ) : null}
       </form>
     </section>

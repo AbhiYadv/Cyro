@@ -4,9 +4,11 @@ import {
   applyStreamEventToMessage,
   cancelButtonLabel,
   finishReasonStatusLabel,
+  hasActiveGenerationId,
   isCancelDisabledWhileGenerating,
   isCancelVisibleWhileGenerating,
   isGenerationActive,
+  isGenerationControlActive,
   isSendDisabledWhileGenerating,
   streamingErrorText
 } from "../services/streamingChat";
@@ -104,6 +106,14 @@ describe("streaming chat message reducer", () => {
     expect(isCancelVisibleWhileGenerating("streaming")).toBe(true);
     expect(isCancelDisabledWhileGenerating("streaming")).toBe(false);
     expect(cancelButtonLabel("streaming")).toBe("Stop");
+  });
+
+  it("keeps generation controls active when Rust has supplied a generation id", () => {
+    expect(hasActiveGenerationId("generation:1")).toBe(true);
+    expect(hasActiveGenerationId(null)).toBe(false);
+    expect(isGenerationControlActive("idle", "generation:1")).toBe(true);
+    expect(isCancelVisibleWhileGenerating("idle", "generation:1")).toBe(true);
+    expect(isSendDisabledWhileGenerating("idle", "generation:1")).toBe(true);
   });
 
   it("keeps cancel visible but disabled once cancellation is in progress", () => {

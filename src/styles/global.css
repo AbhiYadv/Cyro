@@ -387,6 +387,14 @@ textarea:disabled {
   color: #fecdd3;
 }
 
+.generation-state-label {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .runtime-panel {
   display: flex;
   flex-direction: column;
