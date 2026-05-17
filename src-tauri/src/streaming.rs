@@ -24,6 +24,15 @@ const READ_BUFFER_BYTES: usize = 256;
 const STDOUT_DRAIN_IDLE_ROUNDS: usize = 20;
 const DEV_CANCEL_VALIDATION_ENV: &str = "CYRO_STREAM_TEST_SLOW";
 const DEV_CANCEL_VALIDATION_DELAY_MS: u64 = 2_500;
+const DEV_CANCEL_VALIDATION_CHUNK_DELAY_MS: u64 = 200;
+const DEV_CANCEL_VALIDATION_CHUNK_CHARS: usize = 24;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DevCancelValidationConfig {
+    initial_delay: Duration,
+    chunk_delay: Duration,
+    chunk_chars: usize,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -225,11 +234,17 @@ impl GenerationManager {
         active.state = GenerationState::Cancelling;
         active.cancel_requested.store(true, Ordering::SeqCst);
         let generation_id = active.generation_id.clone();
-        let kill_result = active
-            .child
-            .lock()
-            .map_err(|_| generation_state_error())?
-            .kill();
+        let kill_result = {
+            let mut child = active.child.lock().map_err(|_| generation_state_error())?;
+            match child.kill() {
+                Ok(()) => Ok(()),
+                Err(kill_error) => match child.try_wait() {
+                    Ok(Some(_)) => Ok(()),
+                    Ok(None) => Err(kill_error.to_string()),
+                    Err(wait_error) => Err(format!("{kill_error}; tryWait={wait_error}")),
+                },
+            }
+        };
 
         if let Err(error) = kill_result {
             return Err(RuntimeError::recoverable(
@@ -262,7 +277,28 @@ pub fn run_streaming_llama_cli_prompt<F>(
     mode: RuntimeMode,
     model_id: Option<String>,
     generation_manager: &GenerationManager,
+    emit: F,
+) -> Result<StreamingPromptResult, RuntimeError>
+where
+    F: FnMut(StreamEvent) + Send,
+{
+    run_streaming_llama_cli_prompt_with_dev_config(
+        request,
+        mode,
+        model_id,
+        generation_manager,
+        emit,
+        dev_cancel_validation_config(),
+    )
+}
+
+fn run_streaming_llama_cli_prompt_with_dev_config<F>(
+    request: &LlamaCliRequest,
+    mode: RuntimeMode,
+    model_id: Option<String>,
+    generation_manager: &GenerationManager,
     mut emit: F,
+    dev_cancel_config: Option<DevCancelValidationConfig>,
 ) -> Result<StreamingPromptResult, RuntimeError>
 where
     F: FnMut(StreamEvent) + Send,
@@ -338,7 +374,7 @@ where
         error: None,
     });
     generation_manager.set_state(&generation_id, GenerationState::Streaming)?;
-    hold_dev_cancel_validation_window(&cancel_requested);
+    hold_dev_cancel_validation_window(&cancel_requested, dev_cancel_config);
 
     let mut raw_stdout = String::new();
 
@@ -349,7 +385,7 @@ where
             }
 
             raw_stdout.push_str(&delta);
-            emit_clean_stdout_delta(
+            let cancelled_while_emitting = emit_clean_stdout_delta(
                 &raw_stdout,
                 &request.prompt,
                 &mut emitted_stdout,
@@ -358,7 +394,12 @@ where
                 &generation_id,
                 &model_id,
                 started_at,
+                &cancel_requested,
+                dev_cancel_config,
             );
+            if cancelled_while_emitting {
+                break;
+            }
         }
 
         if cancel_requested.load(Ordering::SeqCst) {
@@ -373,12 +414,13 @@ where
                     &generation_id,
                     &model_id,
                     started_at,
+                    &cancel_requested,
+                    dev_cancel_config,
                 );
                 return finish_cancelled(
                     generation_manager,
                     generation_id,
-                    raw_stdout,
-                    request,
+                    emitted_stdout,
                     model_id,
                     mode,
                     sequence + 1,
@@ -404,6 +446,8 @@ where
                 &generation_id,
                 &model_id,
                 started_at,
+                &cancel_requested,
+                dev_cancel_config,
             );
             return finish_timed_out(
                 generation_manager,
@@ -430,14 +474,15 @@ where
                 &generation_id,
                 &model_id,
                 started_at,
+                &cancel_requested,
+                dev_cancel_config,
             );
 
             if cancel_requested.load(Ordering::SeqCst) {
                 return finish_cancelled(
                     generation_manager,
                     generation_id,
-                    raw_stdout,
-                    request,
+                    emitted_stdout,
                     model_id,
                     mode,
                     sequence + 1,
@@ -534,8 +579,7 @@ where
 fn finish_cancelled<F>(
     generation_manager: &GenerationManager,
     generation_id: String,
-    raw_stdout: String,
-    request: &LlamaCliRequest,
+    final_text: String,
     model_id: Option<String>,
     _mode: RuntimeMode,
     sequence: u64,
@@ -545,7 +589,6 @@ fn finish_cancelled<F>(
 where
     F: FnMut(StreamEvent),
 {
-    let final_text = cleanup_stdout(&raw_stdout, &request.prompt);
     let elapsed_ms = elapsed_ms(started_at);
     generation_manager.clear(&generation_id, FinishReason::Cancelled)?;
     emit(StreamEvent {
@@ -710,23 +753,31 @@ fn spawn_bounded_stderr_reader(
 }
 
 // Opt-in development hook for validating Cancel against very fast local models.
-fn hold_dev_cancel_validation_window(cancel_requested: &AtomicBool) {
-    let delay = dev_cancel_validation_delay();
-    if delay == Duration::ZERO {
+fn hold_dev_cancel_validation_window(
+    cancel_requested: &AtomicBool,
+    config: Option<DevCancelValidationConfig>,
+) {
+    let Some(config) = config else {
         return;
-    }
+    };
 
-    let started_at = Instant::now();
-    while started_at.elapsed() < delay && !cancel_requested.load(Ordering::SeqCst) {
-        thread::sleep(Duration::from_millis(50));
-    }
+    wait_for_dev_cancel_validation(config.initial_delay, cancel_requested);
 }
 
-fn dev_cancel_validation_delay() -> Duration {
-    dev_cancel_validation_delay_for_value(std::env::var(DEV_CANCEL_VALIDATION_ENV).ok().as_deref())
-}
-
+#[cfg(test)]
 fn dev_cancel_validation_delay_for_value(value: Option<&str>) -> Duration {
+    dev_cancel_validation_config_for_value(value)
+        .map(|config| config.initial_delay)
+        .unwrap_or(Duration::ZERO)
+}
+
+fn dev_cancel_validation_config() -> Option<DevCancelValidationConfig> {
+    dev_cancel_validation_config_for_value(std::env::var(DEV_CANCEL_VALIDATION_ENV).ok().as_deref())
+}
+
+fn dev_cancel_validation_config_for_value(
+    value: Option<&str>,
+) -> Option<DevCancelValidationConfig> {
     let enabled = matches!(
         value
             .unwrap_or_default()
@@ -737,10 +788,30 @@ fn dev_cancel_validation_delay_for_value(value: Option<&str>) -> Duration {
     );
 
     if enabled {
-        Duration::from_millis(DEV_CANCEL_VALIDATION_DELAY_MS)
+        Some(DevCancelValidationConfig {
+            initial_delay: Duration::from_millis(DEV_CANCEL_VALIDATION_DELAY_MS),
+            chunk_delay: Duration::from_millis(DEV_CANCEL_VALIDATION_CHUNK_DELAY_MS),
+            chunk_chars: DEV_CANCEL_VALIDATION_CHUNK_CHARS,
+        })
     } else {
-        Duration::ZERO
+        None
     }
+}
+
+fn wait_for_dev_cancel_validation(delay: Duration, cancel_requested: &AtomicBool) -> bool {
+    if delay == Duration::ZERO {
+        return cancel_requested.load(Ordering::SeqCst);
+    }
+
+    let started_at = Instant::now();
+    while started_at.elapsed() < delay {
+        if cancel_requested.load(Ordering::SeqCst) {
+            return true;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+
+    cancel_requested.load(Ordering::SeqCst)
 }
 
 fn drain_stdout<F>(
@@ -753,6 +824,8 @@ fn drain_stdout<F>(
     generation_id: &str,
     model_id: &Option<String>,
     started_at: Instant,
+    cancel_requested: &AtomicBool,
+    dev_cancel_config: Option<DevCancelValidationConfig>,
 ) where
     F: FnMut(StreamEvent),
 {
@@ -766,7 +839,7 @@ fn drain_stdout<F>(
                 }
 
                 raw_stdout.push_str(&delta);
-                emit_clean_stdout_delta(
+                let cancelled_while_emitting = emit_clean_stdout_delta(
                     raw_stdout,
                     prompt,
                     emitted_stdout,
@@ -775,7 +848,12 @@ fn drain_stdout<F>(
                     generation_id,
                     model_id,
                     started_at,
+                    cancel_requested,
+                    dev_cancel_config,
                 );
+                if cancelled_while_emitting {
+                    break;
+                }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 idle_rounds += 1;
@@ -797,37 +875,98 @@ fn emit_clean_stdout_delta<F>(
     generation_id: &str,
     model_id: &Option<String>,
     started_at: Instant,
-) where
+    cancel_requested: &AtomicBool,
+    dev_cancel_config: Option<DevCancelValidationConfig>,
+) -> bool
+where
     F: FnMut(StreamEvent),
 {
     let cleaned = cleanup_stdout(raw_stdout, prompt);
     if cleaned.is_empty() || cleaned == *emitted_stdout {
-        return;
+        return false;
     }
 
     let delta = if cleaned.starts_with(emitted_stdout.as_str()) {
         cleaned[emitted_stdout.len()..].to_string()
     } else {
+        emitted_stdout.clear();
         cleaned.clone()
     };
 
     if delta.is_empty() {
-        return;
+        return false;
     }
 
-    *emitted_stdout = cleaned;
-    *sequence += 1;
-    emit(StreamEvent {
-        generation_id: generation_id.to_string(),
-        event_type: StreamEventType::Delta,
-        delta: Some(delta),
-        elapsed_ms: elapsed_ms(started_at),
-        model_id: model_id.clone(),
-        route: RuntimeRoute::LocalSidecar,
-        sequence: *sequence,
-        finish_reason: None,
-        error: None,
-    });
+    let Some(config) = dev_cancel_config else {
+        *emitted_stdout = cleaned;
+        *sequence += 1;
+        emit(StreamEvent {
+            generation_id: generation_id.to_string(),
+            event_type: StreamEventType::Delta,
+            delta: Some(delta),
+            elapsed_ms: elapsed_ms(started_at),
+            model_id: model_id.clone(),
+            route: RuntimeRoute::LocalSidecar,
+            sequence: *sequence,
+            finish_reason: None,
+            error: None,
+        });
+        return false;
+    };
+
+    let chunks = split_delta_for_dev_cancel_validation(&delta, config.chunk_chars);
+    let chunk_count = chunks.len();
+
+    for (index, chunk) in chunks.into_iter().enumerate() {
+        if cancel_requested.load(Ordering::SeqCst) {
+            return true;
+        }
+
+        emitted_stdout.push_str(&chunk);
+        *sequence += 1;
+        emit(StreamEvent {
+            generation_id: generation_id.to_string(),
+            event_type: StreamEventType::Delta,
+            delta: Some(chunk),
+            elapsed_ms: elapsed_ms(started_at),
+            model_id: model_id.clone(),
+            route: RuntimeRoute::LocalSidecar,
+            sequence: *sequence,
+            finish_reason: None,
+            error: None,
+        });
+
+        if index + 1 < chunk_count
+            && wait_for_dev_cancel_validation(config.chunk_delay, cancel_requested)
+        {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn split_delta_for_dev_cancel_validation(delta: &str, chunk_chars: usize) -> Vec<String> {
+    let chunk_chars = chunk_chars.max(1);
+    let mut chunks = Vec::new();
+    let mut current = String::new();
+    let mut current_chars = 0;
+
+    for character in delta.chars() {
+        current.push(character);
+        current_chars += 1;
+
+        if current_chars >= chunk_chars {
+            chunks.push(std::mem::take(&mut current));
+            current_chars = 0;
+        }
+    }
+
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+
+    chunks
 }
 
 fn child_has_exited(child: &Arc<Mutex<Child>>) -> Result<bool, RuntimeError> {
@@ -904,7 +1043,8 @@ fn elapsed_ms(started_at: Instant) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        run_streaming_llama_cli_prompt, GenerationManager, GenerationState, StreamEventType,
+        run_streaming_llama_cli_prompt, run_streaming_llama_cli_prompt_with_dev_config,
+        DevCancelValidationConfig, GenerationManager, GenerationState, StreamEventType,
     };
     use crate::{
         llama_cli::{LlamaCliRequest, RuntimeBackendMode},
@@ -913,9 +1053,12 @@ mod tests {
     use std::{
         fs,
         path::{Path, PathBuf},
-        sync::{Arc, Mutex},
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc, Mutex,
+        },
         thread,
-        time::{Duration, SystemTime, UNIX_EPOCH},
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     };
 
     #[test]
@@ -1176,6 +1319,138 @@ mod tests {
             super::dev_cancel_validation_delay_for_value(Some("slow")),
             Duration::from_millis(super::DEV_CANCEL_VALIDATION_DELAY_MS)
         );
+        assert_eq!(
+            super::dev_cancel_validation_config_for_value(Some("1"))
+                .unwrap()
+                .chunk_delay,
+            Duration::from_millis(super::DEV_CANCEL_VALIDATION_CHUNK_DELAY_MS)
+        );
+    }
+
+    #[test]
+    fn dev_cancel_validation_splits_large_delta_into_visible_chunks() {
+        let cancel_requested = AtomicBool::new(false);
+        let mut emitted_stdout = String::new();
+        let mut sequence = 0;
+        let mut events = Vec::new();
+        let config = DevCancelValidationConfig {
+            initial_delay: Duration::ZERO,
+            chunk_delay: Duration::ZERO,
+            chunk_chars: 8,
+        };
+
+        let cancelled = super::emit_clean_stdout_delta(
+            "This is a long generated answer for manual cancel validation.",
+            "private prompt",
+            &mut emitted_stdout,
+            &mut sequence,
+            &mut |event| events.push(event),
+            "generation:test",
+            &Some("qwen-0_8b-local".to_string()),
+            Instant::now(),
+            &cancel_requested,
+            Some(config),
+        );
+
+        let delta_text = events
+            .iter()
+            .filter_map(|event| event.delta.as_deref())
+            .collect::<String>();
+
+        assert!(!cancelled);
+        assert!(events.len() > 1);
+        assert_eq!(
+            delta_text,
+            "This is a long generated answer for manual cancel validation."
+        );
+    }
+
+    #[test]
+    fn dev_cancel_validation_cancel_stops_remaining_delta_chunks() {
+        let cancel_requested = AtomicBool::new(false);
+        let mut emitted_stdout = String::new();
+        let mut sequence = 0;
+        let mut events = Vec::new();
+        let config = DevCancelValidationConfig {
+            initial_delay: Duration::ZERO,
+            chunk_delay: Duration::ZERO,
+            chunk_chars: 8,
+        };
+
+        let cancelled = super::emit_clean_stdout_delta(
+            "This generated answer should not fully emit after cancel.",
+            "private prompt",
+            &mut emitted_stdout,
+            &mut sequence,
+            &mut |event| {
+                events.push(event);
+                cancel_requested.store(true, Ordering::SeqCst);
+            },
+            "generation:test",
+            &Some("qwen-0_8b-local".to_string()),
+            Instant::now(),
+            &cancel_requested,
+            Some(config),
+        );
+
+        let delta_text = events
+            .iter()
+            .filter_map(|event| event.delta.as_deref())
+            .collect::<String>();
+
+        assert!(cancelled);
+        assert_eq!(events.len(), 1);
+        assert_eq!(delta_text, "This gen");
+        assert_eq!(emitted_stdout, "This gen");
+    }
+
+    #[test]
+    fn dev_cancel_validation_cancel_clears_active_generation_after_child_exit() {
+        let sandbox = TestSandbox::new("dev_slow_cancel_after_exit");
+        let binary = sandbox.write_executable(
+            "llama-cli",
+            "#!/bin/sh\nprintf 'This generated answer is long enough to split into several delayed chunks for cancel validation.'\n",
+        );
+        let manager = Arc::new(GenerationManager::default());
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let request = request_for(&binary, "cancel prompt", Duration::from_secs(5));
+        let manager_for_thread = Arc::clone(&manager);
+        let events_for_thread = Arc::clone(&events);
+        let config = DevCancelValidationConfig {
+            initial_delay: Duration::ZERO,
+            chunk_delay: Duration::from_millis(10),
+            chunk_chars: 8,
+        };
+
+        let handle = thread::spawn(move || {
+            run_streaming_llama_cli_prompt_with_dev_config(
+                &request,
+                RuntimeMode::Fast,
+                Some("qwen-0_8b-local".to_string()),
+                &manager_for_thread,
+                |event| events_for_thread.lock().unwrap().push(event),
+                Some(config),
+            )
+        });
+
+        wait_until_active(&manager);
+        wait_until_delta(&events);
+        let response = manager.cancel_generation(None).unwrap();
+        assert!(response.cancelled);
+
+        let result = handle.join().unwrap().unwrap();
+
+        assert_eq!(result.finish_reason, FinishReason::Cancelled);
+        assert!(result.cancelled);
+        assert_eq!(
+            manager.snapshot().unwrap().state,
+            GenerationState::Cancelled
+        );
+        assert!(events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|event| event.event_type == StreamEventType::Cancelled));
     }
 
     #[test]
@@ -1233,6 +1508,21 @@ mod tests {
             thread::sleep(Duration::from_millis(10));
         }
         panic!("generation did not become active");
+    }
+
+    fn wait_until_delta(events: &Arc<Mutex<Vec<super::StreamEvent>>>) {
+        for _ in 0..500 {
+            if events
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|event| event.event_type == StreamEventType::Delta)
+            {
+                return;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        panic!("generation did not emit a delta");
     }
 
     struct TestSandbox {
