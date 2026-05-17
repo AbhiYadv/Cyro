@@ -1,6 +1,6 @@
 use std::{
     io::Read,
-    process::{Child, Command, ExitStatus, Stdio},
+    process::{Child, ExitStatus},
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc, Arc, Mutex,
@@ -13,8 +13,8 @@ use serde::Serialize;
 
 use crate::{
     llama_cli::{
-        build_llama_cli_args_for_request, cleanup_stdout, empty_stdout_debug,
-        llama_cli_working_dir, sanitize_debug_output, LlamaCliRequest, MAX_DEBUG_CHARS,
+        cleanup_stdout, empty_stdout_debug, prepare_llama_cli_command, sanitize_debug_output,
+        LlamaCliRequest, MAX_DEBUG_CHARS,
     },
     runtime_types::{FinishReason, GenerationState, RuntimeError, RuntimeMode, RuntimeRoute},
 };
@@ -267,28 +267,15 @@ where
 {
     let generation_id = new_generation_id();
     let started_at = Instant::now();
-    let args = build_llama_cli_args_for_request(request);
-    let working_dir = llama_cli_working_dir(&request.binary_path);
-
-    let mut command = Command::new(&request.binary_path);
-    if let Some(working_dir) = working_dir {
-        command.current_dir(working_dir);
-    }
-
-    let mut child = command
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| {
-            RuntimeError::recoverable(
-                "sidecar_spawn_failed",
-                "Cyro could not start the local llama.cpp sidecar.",
-                "Check that the configured llama-cli path still exists and is executable.",
-                Some(error.to_string()),
-            )
-        })?;
+    let mut prepared = prepare_llama_cli_command(request);
+    let mut child = prepared.command.spawn().map_err(|error| {
+        RuntimeError::recoverable(
+            "sidecar_spawn_failed",
+            "Cyro could not start the local llama.cpp sidecar.",
+            "Check that the configured llama-cli path still exists and is executable.",
+            Some(error.to_string()),
+        )
+    })?;
 
     let stdout = match child.stdout.take() {
         Some(stdout) => stdout,

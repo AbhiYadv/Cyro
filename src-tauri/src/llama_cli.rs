@@ -13,7 +13,7 @@ use crate::runtime_types::{FinishReason, RuntimeError};
 
 const DEFAULT_PROMPT_TIMEOUT_SECS: u64 = 60;
 pub(crate) const MAX_DEBUG_CHARS: usize = 1_200;
-const LLAMA_CLI_ONE_SHOT_ARGS: [&str; 1] = ["--single-turn"];
+const LLAMA_CLI_ONE_SHOT_ARGS: [&str; 2] = ["--single-turn", "--simple-io"];
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -107,6 +107,11 @@ pub struct LlamaCliOutput {
     pub finish_reason: FinishReason,
 }
 
+pub(crate) struct PreparedLlamaCliCommand {
+    pub command: Command,
+    pub working_dir: Option<PathBuf>,
+}
+
 impl LlamaCliRequest {
     #[cfg(test)]
     pub fn new(binary_path: String, model_path: String, prompt: String, max_tokens: u32) -> Self {
@@ -139,7 +144,7 @@ impl LlamaCliRequest {
 
     fn launch_fingerprint(&self, working_dir: Option<&Path>) -> String {
         format!(
-            "backendMode={}; cpuFallbackApplied={}; workingDir={}; argFingerprint=modelPathConfigured:true,promptRedacted:true,maxTokens:{},singleTurn:true,deviceNone:{}",
+            "backendMode={}; cpuFallbackApplied={}; workingDir={}; argFingerprint=modelPathConfigured:true,promptRedacted:true,maxTokens:{},singleTurn:true,simpleIo:true,deviceNone:{}",
             self.backend_mode.as_str(),
             self.backend_mode.cpu_fallback_applied(),
             working_dir
@@ -181,10 +186,35 @@ pub(crate) fn llama_cli_working_dir(binary_path: &str) -> Option<PathBuf> {
     Path::new(binary_path).parent().map(Path::to_path_buf)
 }
 
+pub(crate) fn prepare_llama_cli_command(request: &LlamaCliRequest) -> PreparedLlamaCliCommand {
+    let working_dir = llama_cli_working_dir(&request.binary_path);
+    let mut command = Command::new(&request.binary_path);
+    if let Some(working_dir) = working_dir.as_deref() {
+        command.current_dir(working_dir);
+    }
+
+    command
+        .args(build_llama_cli_args_for_request(request))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    PreparedLlamaCliCommand {
+        command,
+        working_dir,
+    }
+}
+
 pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput, RuntimeError> {
     let started_at = Instant::now();
-    let working_dir = llama_cli_working_dir(&request.binary_path);
-    let output = capture_llama_cli_output(request, working_dir.as_deref(), started_at)?;
+    let mut prepared = prepare_llama_cli_command(request);
+    let working_dir = prepared.working_dir.clone();
+    let output = capture_llama_cli_output(
+        request,
+        &mut prepared.command,
+        working_dir.as_deref(),
+        started_at,
+    )?;
     let elapsed_ms = elapsed_ms(started_at);
 
     if !output.status.success() {
@@ -231,29 +261,18 @@ struct CapturedLlamaCliOutput {
 
 fn capture_llama_cli_output(
     request: &LlamaCliRequest,
+    command: &mut Command,
     working_dir: Option<&Path>,
     started_at: Instant,
 ) -> Result<CapturedLlamaCliOutput, RuntimeError> {
-    let args = build_llama_cli_args_for_request(request);
-    let mut command = Command::new(&request.binary_path);
-    if let Some(working_dir) = working_dir {
-        command.current_dir(working_dir);
-    }
-
-    let mut child = command
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| {
-            RuntimeError::recoverable(
-                "sidecar_spawn_failed",
-                "Cyro could not start the local llama.cpp sidecar.",
-                "Check that the configured llama-cli path still exists and is executable.",
-                Some(error.to_string()),
-            )
-        })?;
+    let mut child = command.spawn().map_err(|error| {
+        RuntimeError::recoverable(
+            "sidecar_spawn_failed",
+            "Cyro could not start the local llama.cpp sidecar.",
+            "Check that the configured llama-cli path still exists and is executable.",
+            Some(error.to_string()),
+        )
+    })?;
 
     let stdout = match child.stdout.take() {
         Some(stdout) => stdout,
@@ -691,8 +710,8 @@ pub(crate) fn dev_cpu_fallback_enabled() -> bool {
 mod tests {
     use super::{
         build_llama_cli_args, build_llama_cli_args_for_request, llama_cli_working_dir,
-        run_llama_cli_prompt, sanitize_max_tokens, FinishReason, LlamaCliRequest,
-        RuntimeBackendMode,
+        prepare_llama_cli_command, run_llama_cli_prompt, sanitize_max_tokens, FinishReason,
+        LlamaCliRequest, RuntimeBackendMode,
     };
     use std::{
         fs,
@@ -713,7 +732,8 @@ mod tests {
                 "hello; rm -rf /",
                 "-n",
                 "120",
-                "--single-turn"
+                "--single-turn",
+                "--simple-io"
             ]
         );
     }
@@ -747,6 +767,7 @@ mod tests {
                 "-n",
                 "24",
                 "--single-turn",
+                "--simple-io",
                 "--device",
                 "none"
             ]
@@ -774,9 +795,38 @@ mod tests {
                 "hello",
                 "-n",
                 "24",
-                "--single-turn"
+                "--single-turn",
+                "--simple-io"
             ]
         );
+    }
+
+    #[test]
+    fn prepared_command_uses_piped_stdout_and_stderr() {
+        let sandbox = TestSandbox::new("prepared_pipes");
+        let binary = sandbox.write_executable(
+            "llama-cli",
+            "#!/bin/sh\nprintf 'captured stdout\\n'\nprintf 'captured stderr\\n' >&2\n",
+        );
+        let request = LlamaCliRequest {
+            binary_path: path_str(&binary).to_string(),
+            model_path: "/tmp/model.gguf".to_string(),
+            prompt: "private prompt".to_string(),
+            max_tokens: 8,
+            timeout: Duration::from_secs(5),
+            backend_mode: RuntimeBackendMode::Auto,
+        };
+        let mut prepared = prepare_llama_cli_command(&request);
+
+        let output = prepared
+            .command
+            .spawn()
+            .expect("prepared command should spawn")
+            .wait_with_output()
+            .expect("prepared command should capture output");
+
+        assert_eq!(String::from_utf8_lossy(&output.stdout), "captured stdout\n");
+        assert_eq!(String::from_utf8_lossy(&output.stderr), "captured stderr\n");
     }
 
     #[test]

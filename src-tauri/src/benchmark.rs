@@ -522,6 +522,7 @@ mod tests {
         assert!(args.contains(&"/tmp/model.gguf".to_string()));
         assert!(args.contains(&"-p".to_string()));
         assert!(args.contains(&BENCHMARK_PROMPT.to_string()));
+        assert!(args.contains(&"--simple-io".to_string()));
         assert!(!args.join(" ").contains("sh -c"));
     }
 
