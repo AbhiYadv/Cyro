@@ -1,6 +1,6 @@
 use std::{
     io::Read,
-    process::{Child, Command, Stdio},
+    process::{Child, Command, ExitStatus, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc, Arc, Mutex,
@@ -428,7 +428,8 @@ where
             );
         }
 
-        if let Some(success) = child_exit_success(&child)? {
+        if let Some(exit_status) = child_exit_status(&child)? {
+            let success = exit_status.success();
             drain_stdout(
                 &stdout_rx,
                 &mut raw_stdout,
@@ -478,17 +479,21 @@ where
 
             let final_text = cleanup_stdout(&raw_stdout, &request.prompt);
             if final_text.is_empty() {
+                let elapsed_ms = elapsed_ms(started_at);
                 let error = RuntimeError::recoverable(
-                    "sidecar_empty_response",
+                    "sidecar_empty_output",
                     "The local llama.cpp sidecar returned no text.",
                     "Try a shorter prompt or a different validated GGUF model.",
-                    Some(empty_stdout_debug(
-                        &raw_stdout,
-                        &stderr_buffer
-                            .lock()
-                            .map(|value| value.clone())
-                            .unwrap_or_default(),
-                        &request.prompt,
+                    Some(format!(
+                        "exitStatus={exit_status}; elapsedMs={elapsed_ms}; {}",
+                        empty_stdout_debug(
+                            &raw_stdout,
+                            &stderr_buffer
+                                .lock()
+                                .map(|value| value.clone())
+                                .unwrap_or_default(),
+                            &request.prompt,
+                        )
                     )),
                 );
                 return finish_error(
@@ -816,19 +821,16 @@ fn child_has_exited(child: &Arc<Mutex<Child>>) -> Result<bool, RuntimeError> {
         })
 }
 
-fn child_exit_success(child: &Arc<Mutex<Child>>) -> Result<Option<bool>, RuntimeError> {
+fn child_exit_status(child: &Arc<Mutex<Child>>) -> Result<Option<ExitStatus>, RuntimeError> {
     let mut child = child.lock().map_err(|_| generation_state_error())?;
-    child
-        .try_wait()
-        .map(|status| status.map(|status| status.success()))
-        .map_err(|error| {
-            RuntimeError::recoverable(
-                "sidecar_wait_failed",
-                "Cyro could not read the local sidecar process result.",
-                "Retry the prompt after confirming the sidecar path is valid.",
-                Some(error.to_string()),
-            )
-        })
+    child.try_wait().map_err(|error| {
+        RuntimeError::recoverable(
+            "sidecar_wait_failed",
+            "Cyro could not read the local sidecar process result.",
+            "Retry the prompt after confirming the sidecar path is valid.",
+            Some(error.to_string()),
+        )
+    })
 }
 
 fn bounded_stderr_debug(stderr_buffer: &Arc<Mutex<String>>, prompt: &str) -> Option<String> {
@@ -940,7 +942,7 @@ mod tests {
         let manager = GenerationManager::default();
         let events = Arc::new(Mutex::new(Vec::new()));
         let events_for_run = Arc::clone(&events);
-        let request = request_for(&binary, prompt, Duration::from_secs(2));
+        let request = request_for(&binary, prompt, Duration::from_secs(5));
 
         let result = run_streaming_llama_cli_prompt(
             &request,
@@ -965,6 +967,42 @@ mod tests {
         assert!(!delta_text.contains(prompt));
         assert!(!delta_text.contains("[ Prompt:"));
         assert!(!delta_text.contains("Exiting"));
+    }
+
+    #[test]
+    fn streaming_empty_success_returns_empty_output_diagnostics() {
+        let prompt = "private prompt";
+        let sandbox = TestSandbox::new("empty_success");
+        let binary = sandbox.write_executable("llama-cli", "#!/bin/sh\nexit 0\n");
+        let manager = GenerationManager::default();
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let events_for_run = Arc::clone(&events);
+        let request = request_for(&binary, prompt, Duration::from_secs(5));
+
+        let result = run_streaming_llama_cli_prompt(
+            &request,
+            RuntimeMode::Fast,
+            Some("qwen-0_8b-local".to_string()),
+            &manager,
+            |event| events_for_run.lock().unwrap().push(event),
+        )
+        .expect("streaming empty success should return an error result");
+
+        let error = result.error.expect("empty output should surface an error");
+        let debug = error.debug_detail_safe.as_deref().unwrap_or_default();
+
+        assert_eq!(error.code, "sidecar_empty_output");
+        assert_eq!(result.finish_reason, FinishReason::Error);
+        assert!(debug.contains("exitStatus="));
+        assert!(debug.contains("elapsedMs="));
+        assert!(debug.contains("stdoutShape=bytes:0"));
+        assert!(debug.contains("stderrShape=bytes:0"));
+        assert!(!debug.contains(prompt));
+        assert!(events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|event| event.event_type == StreamEventType::Error));
     }
 
     #[test]

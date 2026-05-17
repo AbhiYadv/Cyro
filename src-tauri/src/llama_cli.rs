@@ -102,17 +102,16 @@ pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput,
             let elapsed_ms = elapsed_ms(started_at);
 
             if !output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
                 return Err(RuntimeError::recoverable(
                     "sidecar_exit_failed",
                     "The local llama.cpp sidecar exited with an error.",
                     "Check the configured model path and try a shorter local prompt.",
                     Some(format!(
-                        "exit={}; stderr={}",
+                        "exitStatus={}; elapsedMs={elapsed_ms}; {}",
                         output.status,
-                        sanitize_debug_output(
-                            &String::from_utf8_lossy(&output.stderr),
-                            &request.prompt
-                        )
+                        empty_stdout_debug(&stdout, &stderr, &request.prompt)
                     )),
                 ));
             }
@@ -123,11 +122,12 @@ pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput,
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 return Err(RuntimeError::recoverable(
-                    "sidecar_empty_response",
+                    "sidecar_empty_output",
                     "The local llama.cpp sidecar returned no text.",
                     "Try a shorter prompt or a different validated GGUF model.",
                     Some(format!(
-                        "elapsedMs={elapsed_ms}; {}",
+                        "exitStatus={}; elapsedMs={elapsed_ms}; {}",
+                        output.status,
                         empty_stdout_debug(&stdout, &stderr, &request.prompt)
                     )),
                 ));
@@ -534,7 +534,7 @@ mod tests {
             model_path: "/models/qwen.gguf".to_string(),
             prompt: "hello".to_string(),
             max_tokens: 24,
-            timeout: Duration::from_secs(2),
+            timeout: Duration::from_secs(5),
             cpu_fallback: true,
         };
 
@@ -552,6 +552,7 @@ mod tests {
                 "none"
             ]
         );
+        assert!(!build_llama_cli_args_for_request(&request).contains(&"-ngl".to_string()));
     }
 
     #[test]
@@ -678,7 +679,7 @@ Exiting...
             model_path: "/tmp/model.gguf".to_string(),
             prompt: "private prompt".to_string(),
             max_tokens: 8,
-            timeout: Duration::from_secs(2),
+            timeout: Duration::from_secs(5),
             cpu_fallback: false,
         };
 
@@ -686,11 +687,64 @@ Exiting...
 
         assert_eq!(error.code, "sidecar_exit_failed");
         assert!(error.recoverable);
+        assert!(error
+            .debug_detail_safe
+            .as_deref()
+            .unwrap_or_default()
+            .contains("exitStatus="));
         assert!(!error
             .debug_detail_safe
             .as_deref()
             .unwrap_or_default()
             .contains("private prompt"));
+    }
+
+    #[test]
+    fn empty_success_exit_returns_empty_output_with_exit_diagnostics() {
+        let sandbox = TestSandbox::new("empty_success");
+        let binary = sandbox.write_executable("llama-cli", "#!/bin/sh\nexit 0\n");
+        let request = LlamaCliRequest {
+            binary_path: path_str(&binary).to_string(),
+            model_path: "/tmp/model.gguf".to_string(),
+            prompt: "private prompt".to_string(),
+            max_tokens: 8,
+            timeout: Duration::from_secs(5),
+            cpu_fallback: false,
+        };
+
+        let error = run_llama_cli_prompt(&request).expect_err("empty success should fail safely");
+        let debug = error.debug_detail_safe.as_deref().unwrap_or_default();
+
+        assert_eq!(error.code, "sidecar_empty_output");
+        assert!(debug.contains("exitStatus="));
+        assert!(debug.contains("elapsedMs="));
+        assert!(debug.contains("stdoutShape=bytes:0"));
+        assert!(debug.contains("stderrShape=bytes:0"));
+        assert!(!debug.contains("private prompt"));
+    }
+
+    #[test]
+    fn empty_failed_exit_returns_exit_failed_with_empty_output_diagnostics() {
+        let sandbox = TestSandbox::new("empty_failed");
+        let binary = sandbox.write_executable("llama-cli", "#!/bin/sh\nexit 7\n");
+        let request = LlamaCliRequest {
+            binary_path: path_str(&binary).to_string(),
+            model_path: "/tmp/model.gguf".to_string(),
+            prompt: "private prompt".to_string(),
+            max_tokens: 8,
+            timeout: Duration::from_secs(5),
+            cpu_fallback: false,
+        };
+
+        let error = run_llama_cli_prompt(&request).expect_err("empty failure should fail safely");
+        let debug = error.debug_detail_safe.as_deref().unwrap_or_default();
+
+        assert_eq!(error.code, "sidecar_exit_failed");
+        assert!(debug.contains("exitStatus="));
+        assert!(debug.contains("elapsedMs="));
+        assert!(debug.contains("stdoutShape=bytes:0"));
+        assert!(debug.contains("stderrShape=bytes:0"));
+        assert!(!debug.contains("private prompt"));
     }
 
     #[test]

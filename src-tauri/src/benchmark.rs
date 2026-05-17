@@ -296,9 +296,10 @@ fn benchmark_error_result(
 ) -> RuntimeBenchmarkResult {
     let status = match error.code.as_str() {
         "sidecar_timeout" => BenchmarkStatus::Blocked,
-        "sidecar_exit_failed" | "sidecar_spawn_failed" | "sidecar_empty_response" => {
-            BenchmarkStatus::Failed
-        }
+        "sidecar_exit_failed"
+        | "sidecar_spawn_failed"
+        | "sidecar_empty_output"
+        | "sidecar_empty_response" => BenchmarkStatus::Failed,
         _ => BenchmarkStatus::Failed,
     };
     let latency_class = if status == BenchmarkStatus::Blocked {
@@ -317,7 +318,10 @@ fn benchmark_error_result(
                 0
             }
         });
-    let reason = if error.code == "sidecar_empty_response" {
+    let reason = if matches!(
+        error.code.as_str(),
+        "sidecar_empty_output" | "sidecar_empty_response"
+    ) {
         match error.debug_detail_safe.as_deref() {
             Some(debug_detail) if !debug_detail.trim().is_empty() => format!(
                 "Benchmark failed: {} Safe diagnostic: {}",
@@ -564,13 +568,13 @@ mod tests {
     }
 
     #[test]
-    fn benchmark_empty_response_keeps_elapsed_time_and_safe_diagnostic() {
+    fn benchmark_empty_output_keeps_elapsed_time_and_safe_diagnostic() {
         let error = RuntimeError::recoverable(
-            "sidecar_empty_response",
+            "sidecar_empty_output",
             "The local llama.cpp sidecar returned no text.",
             "Try a shorter prompt.",
             Some(
-                "elapsedMs=1640; stdoutShape=bytes:100,lines:4,nonEmpty:3,blank:1,promptMarkers:1,timing:1,timingFooterFound:true,commands:0,metadata:1,exiting:1,answerCandidates:0,first:Loading model,last:Exiting...; stderrShape=bytes:0,lines:0,nonEmpty:0,blank:0,promptMarkers:0,timing:0,timingFooterFound:false,commands:0,metadata:0,exiting:0,answerCandidates:0,first:[none],last:[none]"
+                "exitStatus=exit status: 0; elapsedMs=1640; stdoutShape=bytes:100,lines:4,nonEmpty:3,blank:1,promptMarkers:1,timing:1,timingFooterFound:true,commands:0,metadata:1,exiting:1,answerCandidates:0,first:Loading model,last:Exiting...; stderrShape=bytes:0,lines:0,nonEmpty:0,blank:0,promptMarkers:0,timing:0,timingFooterFound:false,commands:0,metadata:0,exiting:0,answerCandidates:0,first:[none],last:[none]"
                     .to_string(),
             ),
         );
