@@ -22,6 +22,8 @@ use crate::{
 pub const LOCAL_PROMPT_STREAM_EVENT: &str = "cyro://local-prompt-stream";
 const READ_BUFFER_BYTES: usize = 256;
 const STDOUT_DRAIN_IDLE_ROUNDS: usize = 20;
+const DEV_CANCEL_VALIDATION_ENV: &str = "CYRO_STREAM_TEST_SLOW";
+const DEV_CANCEL_VALIDATION_DELAY_MS: u64 = 2_500;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -336,6 +338,7 @@ where
         error: None,
     });
     generation_manager.set_state(&generation_id, GenerationState::Streaming)?;
+    hold_dev_cancel_validation_window(&cancel_requested);
 
     let mut raw_stdout = String::new();
 
@@ -704,6 +707,40 @@ fn spawn_bounded_stderr_reader(
             }
         }
     });
+}
+
+// Opt-in development hook for validating Cancel against very fast local models.
+fn hold_dev_cancel_validation_window(cancel_requested: &AtomicBool) {
+    let delay = dev_cancel_validation_delay();
+    if delay == Duration::ZERO {
+        return;
+    }
+
+    let started_at = Instant::now();
+    while started_at.elapsed() < delay && !cancel_requested.load(Ordering::SeqCst) {
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn dev_cancel_validation_delay() -> Duration {
+    dev_cancel_validation_delay_for_value(std::env::var(DEV_CANCEL_VALIDATION_ENV).ok().as_deref())
+}
+
+fn dev_cancel_validation_delay_for_value(value: Option<&str>) -> Duration {
+    let enabled = matches!(
+        value
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "slow"
+    );
+
+    if enabled {
+        Duration::from_millis(DEV_CANCEL_VALIDATION_DELAY_MS)
+    } else {
+        Duration::ZERO
+    }
 }
 
 fn drain_stdout<F>(
@@ -1107,6 +1144,38 @@ mod tests {
             .unwrap_or_default();
         assert!(!debug.contains("private prompt"));
         assert!(debug.len() <= super::MAX_DEBUG_CHARS);
+    }
+
+    #[test]
+    fn dev_cancel_validation_delay_is_disabled_by_default() {
+        assert_eq!(
+            super::dev_cancel_validation_delay_for_value(None),
+            Duration::ZERO
+        );
+        assert_eq!(
+            super::dev_cancel_validation_delay_for_value(Some("")),
+            Duration::ZERO
+        );
+        assert_eq!(
+            super::dev_cancel_validation_delay_for_value(Some("0")),
+            Duration::ZERO
+        );
+        assert_eq!(
+            super::dev_cancel_validation_delay_for_value(Some("false")),
+            Duration::ZERO
+        );
+    }
+
+    #[test]
+    fn dev_cancel_validation_delay_requires_explicit_env_value() {
+        assert_eq!(
+            super::dev_cancel_validation_delay_for_value(Some("1")),
+            Duration::from_millis(super::DEV_CANCEL_VALIDATION_DELAY_MS)
+        );
+        assert_eq!(
+            super::dev_cancel_validation_delay_for_value(Some("slow")),
+            Duration::from_millis(super::DEV_CANCEL_VALIDATION_DELAY_MS)
+        );
     }
 
     #[test]

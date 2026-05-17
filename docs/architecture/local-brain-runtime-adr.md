@@ -668,6 +668,7 @@ Streaming behavior:
 - The final result replaces the partial message with cleaned stdout.
 - Non-streaming `send_local_prompt` remains available as a fallback path.
 - `local_mock` fallback remains available when no sidecar and no model path are configured.
+- Development-only cancel validation may be enabled with `CYRO_STREAM_TEST_SLOW=1 pnpm tauri dev`; this holds the Rust-owned stream in an active state briefly so tiny proof models can expose the native Cancel button. The hook is opt-in and must not slow normal runtime behavior.
 
 Output cleanup behavior:
 - remove llama.cpp banner, ASCII logo, metadata, available-command help, prompt shell markers, timing footer, and `Exiting...`
