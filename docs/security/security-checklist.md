@@ -111,7 +111,7 @@
 - [ ] Only one local generation can be active at a time
 - [ ] Send is blocked while generation state is `starting`, `streaming`, or `cancelling`
 - [ ] `cancel_generation` terminates the active Rust-owned child process and clears generating state
-- [ ] `CYRO_STREAM_TEST_SLOW=1` is allowed only as an explicit development/manual cancel validation hook; normal runtime must have no artificial streaming delay
+- [ ] `CYRO_STREAM_TEST_SLOW=1` is allowed only as an explicit development/manual cancel validation hook; normal runtime must have no artificial streaming delay, and deterministic manual Cancel proof is deferred to CYRO-0011C
 - [ ] Timeout terminates or force-kills the child process and clears generating state
 - [ ] child process cleanup is verified for cancel, timeout, process failure, and app-side failure paths
 - [ ] No shell command string, `shell=true`, command concatenation, or frontend-provided sidecar args are used

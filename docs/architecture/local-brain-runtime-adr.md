@@ -668,7 +668,13 @@ Streaming behavior:
 - The final result replaces the partial message with cleaned stdout.
 - Non-streaming `send_local_prompt` remains available as a fallback path.
 - `local_mock` fallback remains available when no sidecar and no model path are configured.
-- Development-only cancel validation may be enabled with `CYRO_STREAM_TEST_SLOW=1 pnpm tauri dev`; this holds the Rust-owned stream in an active state briefly so tiny proof models can expose the native Cancel button. The hook is opt-in and must not slow normal runtime behavior.
+- Development-only cancel validation may be enabled with `CYRO_STREAM_TEST_SLOW=1 pnpm tauri dev`; this holds the Rust-owned stream in an active state briefly and may split output into small delayed chunks. The hook is opt-in and must not slow normal runtime behavior.
+
+Scope close:
+- CYRO-0011B is closed as the streaming stdout implementation with Rust-owned `cancel_generation`, timeout cleanup, one-active-generation guard, ordered stream events, and automated cancel coverage.
+- Native benchmark and `local_sidecar` chat response validation passed in the CPU fallback context used during CYRO-0011B review.
+- Manual Stop/Cancel click validation against the tiny 0.5B proof model is not claimed in CYRO-0011B because generation can complete too quickly for reliable human interaction, even with the dev slow hook.
+- CYRO-0011C will add a deterministic dev-only cancel validation harness using an explicit fake/local slow streaming source that is unavailable in production.
 
 Output cleanup behavior:
 - remove llama.cpp banner, ASCII logo, metadata, available-command help, prompt shell markers, timing footer, and `Exiting...`
