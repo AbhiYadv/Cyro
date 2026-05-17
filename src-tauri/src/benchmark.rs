@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::llama_cli::{run_llama_cli_prompt, LlamaCliRequest};
+use crate::llama_cli::{
+    extract_elapsed_ms_from_debug, run_llama_cli_prompt, BackendModeState, LlamaCliRequest,
+    RuntimeBackendMode,
+};
 use crate::model_registry::{
     validate_model_path_value, ModelRegistryEntry, ModelRegistryState, PLACEHOLDER_MODEL_ID,
 };
@@ -147,6 +150,7 @@ pub fn run_runtime_benchmark(
     model_registry: tauri::State<'_, ModelRegistryState>,
     sidecar_state: tauri::State<'_, SidecarState>,
     benchmark_state: tauri::State<'_, BenchmarkState>,
+    backend_mode_state: tauri::State<'_, BackendModeState>,
 ) -> Result<RuntimeBenchmarkResult, RuntimeError> {
     let request = RuntimeBenchmarkRequest {
         model_id,
@@ -226,7 +230,9 @@ pub fn run_runtime_benchmark(
         return Ok(result);
     }
 
-    let llama_request = build_benchmark_llama_cli_request(&request, &sidecar_path, &model_path);
+    let backend_mode = backend_mode_state.current_mode()?;
+    let llama_request =
+        build_benchmark_llama_cli_request(&request, &sidecar_path, &model_path, backend_mode);
     let result = match run_llama_cli_prompt(&llama_request) {
         Ok(output) => {
             benchmark_success_result(&request, &model_entry, output.elapsed_ms, &output.response)
@@ -242,6 +248,7 @@ fn build_benchmark_llama_cli_request(
     request: &RuntimeBenchmarkRequest,
     binary_path: &str,
     model_path: &str,
+    backend_mode: RuntimeBackendMode,
 ) -> LlamaCliRequest {
     LlamaCliRequest {
         binary_path: binary_path.to_string(),
@@ -249,6 +256,7 @@ fn build_benchmark_llama_cli_request(
         prompt: BENCHMARK_PROMPT.to_string(),
         max_tokens: sanitize_benchmark_max_tokens(request.max_tokens),
         timeout: Duration::from_millis(sanitize_benchmark_timeout_ms(request.timeout_ms)),
+        backend_mode,
     }
 }
 
@@ -293,9 +301,10 @@ fn benchmark_error_result(
 ) -> RuntimeBenchmarkResult {
     let status = match error.code.as_str() {
         "sidecar_timeout" => BenchmarkStatus::Blocked,
-        "sidecar_exit_failed" | "sidecar_spawn_failed" | "sidecar_empty_response" => {
-            BenchmarkStatus::Failed
-        }
+        "sidecar_exit_failed"
+        | "sidecar_spawn_failed"
+        | "sidecar_empty_output"
+        | "sidecar_empty_response" => BenchmarkStatus::Failed,
         _ => BenchmarkStatus::Failed,
     };
     let latency_class = if status == BenchmarkStatus::Blocked {
@@ -303,12 +312,31 @@ fn benchmark_error_result(
     } else {
         LatencyClass::Unknown
     };
-    let elapsed_ms = if error.code == "sidecar_timeout" {
-        sanitize_benchmark_timeout_ms(request.timeout_ms)
+    let elapsed_ms = error
+        .debug_detail_safe
+        .as_deref()
+        .and_then(extract_elapsed_ms_from_debug)
+        .unwrap_or_else(|| {
+            if error.code == "sidecar_timeout" {
+                sanitize_benchmark_timeout_ms(request.timeout_ms)
+            } else {
+                0
+            }
+        });
+    let reason = if matches!(
+        error.code.as_str(),
+        "sidecar_empty_output" | "sidecar_empty_response"
+    ) {
+        match error.debug_detail_safe.as_deref() {
+            Some(debug_detail) if !debug_detail.trim().is_empty() => format!(
+                "Benchmark failed: {} Safe diagnostic: {}",
+                error.message, debug_detail
+            ),
+            _ => format!("Benchmark failed: {}", error.message),
+        }
     } else {
-        0
+        format!("Benchmark failed: {}", error.message)
     };
-    let reason = format!("Benchmark failed: {}", error.message);
 
     build_result(
         request,
@@ -479,6 +507,7 @@ mod tests {
             &request(),
             "/usr/local/bin/llama-cli",
             "/tmp/model.gguf",
+            RuntimeBackendMode::Auto,
         );
         assert_eq!(llama_request.prompt, BENCHMARK_PROMPT);
         assert_eq!(llama_request.max_tokens, 80);
@@ -493,7 +522,25 @@ mod tests {
         assert!(args.contains(&"/tmp/model.gguf".to_string()));
         assert!(args.contains(&"-p".to_string()));
         assert!(args.contains(&BENCHMARK_PROMPT.to_string()));
+        assert!(args.contains(&"--simple-io".to_string()));
         assert!(!args.join(" ").contains("sh -c"));
+    }
+
+    #[test]
+    fn benchmark_request_can_use_cpu_backend_mode() {
+        let llama_request = build_benchmark_llama_cli_request(
+            &request(),
+            "/usr/local/bin/llama-cli",
+            "/tmp/model.gguf",
+            RuntimeBackendMode::Cpu,
+        );
+
+        assert_eq!(llama_request.backend_mode, RuntimeBackendMode::Cpu);
+        assert!(
+            crate::llama_cli::build_llama_cli_args_for_request(&llama_request)
+                .windows(2)
+                .any(|window| window == ["--device", "none"])
+        );
     }
 
     #[test]
@@ -542,6 +589,27 @@ mod tests {
         assert_eq!(result.status, BenchmarkStatus::Failed);
         assert_eq!(result.latency_class, LatencyClass::Unknown);
         assert!(!result.passed);
+    }
+
+    #[test]
+    fn benchmark_empty_output_keeps_elapsed_time_and_safe_diagnostic() {
+        let error = RuntimeError::recoverable(
+            "sidecar_empty_output",
+            "The local llama.cpp sidecar returned no text.",
+            "Try a shorter prompt.",
+            Some(
+                "exitStatus=exit status: 0; elapsedMs=1640; stdoutShape=bytes:100,lines:4,nonEmpty:3,blank:1,promptMarkers:1,timing:1,timingFooterFound:true,commands:0,metadata:1,exiting:1,answerCandidates:0,first:Loading model,last:Exiting...; stderrShape=bytes:0,lines:0,nonEmpty:0,blank:0,promptMarkers:0,timing:0,timingFooterFound:false,commands:0,metadata:0,exiting:0,answerCandidates:0,first:[none],last:[none]"
+                    .to_string(),
+            ),
+        );
+
+        let result = benchmark_error_result(&request(), None, error);
+
+        assert_eq!(result.status, BenchmarkStatus::Failed);
+        assert_eq!(result.elapsed_ms, 1640);
+        assert!(result.reason.contains("Safe diagnostic"));
+        assert!(result.reason.contains("stdoutShape="));
+        assert!(!result.reason.contains(BENCHMARK_PROMPT));
     }
 
     #[test]

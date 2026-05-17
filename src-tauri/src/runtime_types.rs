@@ -7,7 +7,7 @@ pub enum RuntimeMode {
     Thinking,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeRoute {
     LocalMock,
@@ -31,6 +31,22 @@ pub enum RuntimeState {
 pub enum FinishReason {
     Completed,
     MockFallback,
+    Cancelled,
+    TimedOut,
+    Error,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GenerationState {
+    Idle,
+    Starting,
+    Streaming,
+    Cancelling,
+    Cancelled,
+    Completed,
+    TimedOut,
+    Failed,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

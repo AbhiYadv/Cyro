@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   benchmarkStatusLabel,
+  backendModeLabel,
   composeActionableMessage,
   formatBenchmarkElapsed,
   formatBenchmarkTokens,
   formatModelFile,
+  finishReasonLabel,
+  generationStateLabel,
   isBenchmarkRunnable,
   isLocalRuntimeReady,
   latencyClassLabel,
@@ -24,6 +27,8 @@ function status(overrides: Partial<RuntimeStatus> = {}): RuntimeStatus {
     runtimeState: "not_configured",
     activeRoute: "local_mock",
     routeExplanation: "Local Brain is not configured. Cyro will use the local mock fallback.",
+    backendMode: "auto",
+    cpuFallbackActive: false,
     sidecar: mockedSidecarStatus,
     localModel: placeholderModelRegistry[0],
     modelRegistry: placeholderModelRegistry,
@@ -32,6 +37,9 @@ function status(overrides: Partial<RuntimeStatus> = {}): RuntimeStatus {
       latestResult: null,
       message: "Benchmark has not run."
     },
+    generationState: "idle",
+    activeGenerationId: null,
+    lastFinishReason: null,
     lastError: null,
     network: "disabled",
     vault: "not_indexed",
@@ -47,9 +55,24 @@ describe("runtime status presentation helpers", () => {
     const current = status();
 
     expect(runtimeStateLabel(current.runtimeState)).toBe("Not Configured");
+    expect(generationStateLabel(current.generationState)).toBe("Idle");
+    expect(finishReasonLabel(current.lastFinishReason)).toBe("None");
     expect(routeLabel(current.activeRoute)).toBe("Local Mock");
     expect(isLocalRuntimeReady(current)).toBe(false);
     expect(isBenchmarkRunnable(current)).toBe(false);
+  });
+
+  it("labels streaming generation state", () => {
+    const current = status({
+      runtimeState: "generating",
+      generationState: "streaming",
+      activeGenerationId: "generation:1",
+      lastFinishReason: "completed"
+    });
+
+    expect(runtimeStateLabel(current.runtimeState)).toBe("Generating");
+    expect(generationStateLabel(current.generationState)).toBe("Streaming");
+    expect(finishReasonLabel(current.lastFinishReason)).toBe("Completed");
   });
 
   it("detects ready local sidecar status", () => {
@@ -62,6 +85,12 @@ describe("runtime status presentation helpers", () => {
     expect(routeLabel(current.activeRoute)).toBe("Local Sidecar");
     expect(isLocalRuntimeReady(current)).toBe(true);
     expect(isBenchmarkRunnable(current)).toBe(true);
+  });
+
+  it("labels backend mode and CPU fallback state", () => {
+    expect(backendModeLabel("auto")).toBe("Auto");
+    expect(backendModeLabel("cpu")).toBe("CPU Fallback");
+    expect(backendModeLabel("auto", true)).toBe("CPU Fallback");
   });
 
   it("labels benchmark states and formats latest benchmark result", () => {

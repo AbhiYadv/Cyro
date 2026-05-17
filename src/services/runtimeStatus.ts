@@ -1,5 +1,15 @@
 import type { ModelRegistryEntry } from "../types/modelRegistry";
-import type { BenchmarkStatus, LatencyClass, RuntimeBenchmarkResult, RuntimeRoute, RuntimeState, RuntimeStatus } from "../types/runtime";
+import type {
+  BenchmarkStatus,
+  FinishReason,
+  GenerationState,
+  LatencyClass,
+  RuntimeBackendMode,
+  RuntimeBenchmarkResult,
+  RuntimeRoute,
+  RuntimeState,
+  RuntimeStatus
+} from "../types/runtime";
 
 export function runtimeStateLabel(state: RuntimeState) {
   const labels: Record<RuntimeState, string> = {
@@ -20,6 +30,37 @@ export function routeLabel(route: RuntimeRoute) {
   }
 
   return "Local Mock";
+}
+
+export function generationStateLabel(state: GenerationState) {
+  const labels: Record<GenerationState, string> = {
+    idle: "Idle",
+    starting: "Starting",
+    streaming: "Streaming",
+    cancelling: "Cancelling",
+    cancelled: "Cancelled",
+    completed: "Completed",
+    timed_out: "Timed Out",
+    failed: "Failed"
+  };
+
+  return labels[state];
+}
+
+export function finishReasonLabel(reason?: FinishReason | null) {
+  if (!reason) {
+    return "None";
+  }
+
+  const labels: Record<FinishReason, string> = {
+    completed: "Completed",
+    mock_fallback: "Mock Fallback",
+    cancelled: "Cancelled",
+    timed_out: "Timed Out",
+    error: "Error"
+  };
+
+  return labels[reason];
 }
 
 export function benchmarkStatusLabel(status: BenchmarkStatus) {
@@ -45,6 +86,14 @@ export function latencyClassLabel(latencyClass: LatencyClass) {
   };
 
   return labels[latencyClass];
+}
+
+export function backendModeLabel(mode: RuntimeBackendMode, cpuFallbackActive = false) {
+  if (cpuFallbackActive || mode === "cpu") {
+    return "CPU Fallback";
+  }
+
+  return "Auto";
 }
 
 export function routeExplanation(status: RuntimeStatus) {

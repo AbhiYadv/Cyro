@@ -336,23 +336,19 @@ Behavior:
 - React never executes the binary, builds command strings, or owns runtime authority
 - prompt content is not logged by default
 
-CYRO-0007 process arguments:
+CYRO-0007 and CYRO-0011B process arguments:
 - `-m <model_path>`
 - `-p <prompt>`
 - `-n <max_tokens>`
-
-CYRO-0007 also adds fixed internal safety flags for the local `llama-cli` subprocess:
 - `--single-turn`
-- `--no-display-prompt`
-- `--no-show-timings`
-- `--simple-io`
-- `--offline`
 
-These flags are not user-controlled. They keep the first prompt path bounded, prevent the interactive console loop, reduce prompt echo in output, improve subprocess compatibility, and block `llama-cli` network/cache download behavior.
+CYRO-0011B clarified the launch mode after native validation: Cyro uses one-shot `llama-cli` prompt semantics rather than interactive REPL mode. `llama-cli` auto-enables conversation mode for chat-template models, so Cyro adds the minimal documented `--single-turn` flag to make a predefined `-p` prompt exit after one response. Rust still constructs the arguments as a structured array, never a shell command string, sets the child working directory to the sidecar binary parent directory, and closes stdin for the child process.
+
+If Metal initialization fails only under the native/Tauri launch context, developers may launch Cyro with `CYRO_LLAMA_CLI_CPU_FALLBACK=1`. That appends `--device none` to the structured Rust-owned arguments for local manual validation only. CPU fallback is not the product default and React cannot provide arbitrary sidecar flags.
 
 The first proof uses conservative max tokens with a default of `120` and an upper bound of `256`. The command has a timeout and returns actionable `RuntimeError` values for missing sidecar, invalid model, timeout, nonzero exit, empty response, or process wait failure.
 
-Streaming is still future work. `llama-server`, token streaming, cancellation UX, partial output, richer process lifecycle state, and model lifecycle controls remain CYRO-0011 or later.
+`llama-server`, richer model lifecycle controls, queueing, and product-grade model management remain later work.
 
 The provided tiny `0.5B` GGUF test model is a runtime proof only. Output quality from that test model is not representative of final Local Brain answer quality.
 
@@ -643,6 +639,67 @@ CYRO-0011B implementation must include tests for:
 - cancelled message is labeled
 - timeout and error states are actionable
 
+## CYRO-0011B Streaming stdout Implementation
+
+CYRO-0011B implements the CYRO-0011A process lifecycle contract for the local `llama-cli` route. It does not add model files, sidecar binaries, downloads, `llama-server`, Rust FFI, Python, cloud APIs, provider APIs, PGLite persistence, sync, mobile, VPN, AgentScope, or queueing.
+
+Commands:
+- `send_local_prompt_streaming`
+- `cancel_generation`
+
+Tauri event:
+- `cyro://local-prompt-stream`
+
+Implemented stream event names:
+- `started`
+- `delta`
+- `completed`
+- `cancelled`
+- `timeout`
+- `error`
+
+Streaming behavior:
+- Rust validates the configured `llama-cli` path and `.gguf` model path before starting a stream.
+- Rust spawns `llama-cli` with structured one-shot `-m <model> -p <prompt> -n <maxTokens> --single-turn` args.
+- Rust sets the child working directory to the validated sidecar binary parent and closes stdin.
+- If `CYRO_LLAMA_CLI_CPU_FALLBACK=1` is set for development validation, Rust appends `--device none`; this is not a product default.
+- Rust reads stdout incrementally, removes `llama-cli` banner/REPL/timing decoration, and emits ordered cleaned `delta` events.
+- React subscribes to stream events and appends deltas to the active assistant message.
+- The final result replaces the partial message with cleaned stdout.
+- Non-streaming `send_local_prompt` remains available as a fallback path.
+- `local_mock` fallback remains available when no sidecar and no model path are configured.
+- Development-only cancel validation may be enabled with `CYRO_STREAM_TEST_SLOW=1 pnpm tauri dev`; this holds the Rust-owned stream in an active state briefly and may split output into small delayed chunks. The hook is opt-in and must not slow normal runtime behavior.
+
+Scope close:
+- CYRO-0011B is closed as the streaming stdout implementation with Rust-owned `cancel_generation`, timeout cleanup, one-active-generation guard, ordered stream events, and automated cancel coverage.
+- Native benchmark and `local_sidecar` chat response validation passed in the CPU fallback context used during CYRO-0011B review.
+- Manual Stop/Cancel click validation against the tiny 0.5B proof model is not claimed in CYRO-0011B because generation can complete too quickly for reliable human interaction, even with the dev slow hook.
+- CYRO-0011C will add a deterministic dev-only cancel validation harness using an explicit fake/local slow streaming source that is unavailable in production.
+
+Output cleanup behavior:
+- remove llama.cpp banner, ASCII logo, metadata, available-command help, prompt shell markers, timing footer, and `Exiting...`
+- preserve generated assistant answer text, including answer text that appears after a `>` REPL marker
+- benchmark responses use the same cleanup helper before token-rate estimation and never surface raw `llama-cli` shell text as benchmark output
+- if cleanup leaves no assistant text, diagnostics report safe stdout shape counts and bounded prompt-redacted stderr, not raw prompt content
+
+Cancel behavior:
+- only one active local generation is allowed
+- a second streaming generation returns a recoverable `generation_busy` error
+- `cancel_generation` targets the active Rust-owned child process
+- cancel requests move the active generation to `cancelling`
+- the child process is killed through Rust process control
+- final stream state is emitted as `cancelled`
+- partial output may remain visible and is labeled `Cancelled`
+- active generation state is cleared before another local generation can begin
+
+Timeout and failure behavior:
+- streaming uses the same conservative timeout window as the non-streaming prompt path
+- timeout kills or reaps the child process and emits `timeout`
+- nonzero exit and empty response emit `error`
+- stderr/debug detail is bounded and prompt-redacted before it reaches UI state
+- prompt content is not logged by default
+- streamed or partial output is not written to memory automatically
+
 ## LocalModelConfig
 
 Fields:
@@ -739,9 +796,9 @@ Benchmark must never upload telemetry.
 
 ## Streaming and Cancellation
 
-Initial sidecar implementation may return full responses. CYRO-0011A locks the contract for optional `llama-cli` stdout streaming, Rust-owned cancellation, timeout cleanup, partial output labeling, and non-streaming fallback.
+Initial sidecar implementation may return full responses through `send_local_prompt`. CYRO-0011B adds optional `llama-cli` stdout streaming through `send_local_prompt_streaming` and keeps the non-streaming path available as fallback.
 
-CYRO-0011B may implement streaming only after the CYRO-0011A process lifecycle contract is satisfied. `llama-server` remains later work.
+`llama-server` remains later work.
 
 ## Security Requirements
 

@@ -16,6 +16,8 @@ const defaultRuntimeStatus: RuntimeStatus = {
   runtimeState: "not_configured",
   activeRoute: "local_mock",
   routeExplanation: "Local Brain is not configured. Cyro will use the local mock fallback.",
+  backendMode: "auto",
+  cpuFallbackActive: false,
   sidecar: mockedSidecarStatus,
   localModel: placeholderModelRegistry[0],
   modelRegistry: placeholderModelRegistry,
@@ -24,6 +26,9 @@ const defaultRuntimeStatus: RuntimeStatus = {
     latestResult: null,
     message: "Benchmark has not run. Configure local runtime paths before benchmarking."
   },
+  generationState: "idle",
+  activeGenerationId: null,
+  lastFinishReason: null,
   lastError: null,
   network: "disabled",
   vault: "not_indexed",

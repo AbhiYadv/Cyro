@@ -1,4 +1,4 @@
-import type { RuntimeMode, RuntimeRoute } from "./runtime";
+import type { FinishReason, GenerationState, RuntimeCommandError, RuntimeMode, RuntimeRoute } from "./runtime";
 
 export type ChatRole = "user" | "assistant";
 
@@ -10,5 +10,8 @@ export type ChatMessage = {
   route?: RuntimeRoute;
   modelId?: string;
   elapsedMs?: number;
+  finishReason?: FinishReason;
+  generationState?: GenerationState;
+  runtimeError?: RuntimeCommandError | null;
   mocked?: boolean;
 };

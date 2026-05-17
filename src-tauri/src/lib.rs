@@ -5,12 +5,17 @@ mod llama_cli;
 mod model_registry;
 mod runtime_types;
 mod sidecar;
+mod streaming;
 
-use llama_cli::{run_llama_cli_prompt, sanitize_max_tokens, LlamaCliRequest};
-use runtime_types::{
-    mocked_local_prompt_response, FinishReason, LocalPromptResponse, RuntimeError, RuntimeMode,
-    RuntimeRoute, RuntimeState,
+use llama_cli::{
+    run_llama_cli_prompt, sanitize_max_tokens, BackendModeState, LlamaCliRequest,
+    RuntimeBackendMode,
 };
+use runtime_types::{
+    mocked_local_prompt_response, FinishReason, GenerationState, LocalPromptResponse, RuntimeError,
+    RuntimeMode, RuntimeRoute, RuntimeState,
+};
+use tauri::Emitter;
 
 #[derive(Serialize)]
 struct HealthCheck {
@@ -27,10 +32,15 @@ struct RuntimeStatus {
     runtime_state: RuntimeState,
     active_route: RuntimeRoute,
     route_explanation: String,
+    backend_mode: RuntimeBackendMode,
+    cpu_fallback_active: bool,
     sidecar: sidecar::SidecarBinaryStatus,
     local_model: Option<model_registry::ModelRegistryEntry>,
     model_registry: Vec<model_registry::ModelRegistryEntry>,
     benchmark: benchmark::RuntimeBenchmarkStatus,
+    generation_state: GenerationState,
+    active_generation_id: Option<String>,
+    last_finish_reason: Option<FinishReason>,
     last_error: Option<RuntimeError>,
     network: &'static str,
     vault: &'static str,
@@ -49,6 +59,8 @@ fn get_runtime_status(
     model_registry: tauri::State<'_, model_registry::ModelRegistryState>,
     sidecar_state: tauri::State<'_, sidecar::SidecarState>,
     benchmark_state: tauri::State<'_, benchmark::BenchmarkState>,
+    generation_manager: tauri::State<'_, streaming::GenerationManager>,
+    backend_mode_state: tauri::State<'_, BackendModeState>,
 ) -> Result<RuntimeStatus, RuntimeError> {
     let sidecar = sidecar_state.current_status().map_err(|message| {
         RuntimeError::recoverable(
@@ -67,14 +79,24 @@ fn get_runtime_status(
         )
     })?;
     let benchmark = benchmark_state.current_status()?;
+    let generation = generation_manager.snapshot()?;
+    let backend_mode = backend_mode_state.current_mode()?;
 
-    Ok(build_runtime_status(sidecar, registry, benchmark))
+    Ok(build_runtime_status(
+        sidecar,
+        registry,
+        benchmark,
+        generation,
+        backend_mode,
+    ))
 }
 
 fn build_runtime_status(
     sidecar: sidecar::SidecarBinaryStatus,
     model_registry: Vec<model_registry::ModelRegistryEntry>,
     benchmark: benchmark::RuntimeBenchmarkStatus,
+    generation: streaming::GenerationSnapshot,
+    backend_mode: RuntimeBackendMode,
 ) -> RuntimeStatus {
     let local_model = model_registry
         .iter()
@@ -87,7 +109,7 @@ fn build_runtime_status(
         .map(|entry| entry.validated && entry.file_path.is_some())
         .unwrap_or(false);
 
-    let (runtime_state, active_route, route_explanation) = match (sidecar_ready, model_ready) {
+    let (base_runtime_state, active_route, route_explanation) = match (sidecar_ready, model_ready) {
         (true, true) => {
             let benchmark_note = match benchmark.status {
                 benchmark::BenchmarkStatus::NotRun => {
@@ -108,11 +130,17 @@ fn build_runtime_status(
                 }
             };
 
+            let backend_note = if backend_mode.cpu_fallback_applied() {
+                " CPU fallback is active for native validation."
+            } else {
+                ""
+            };
+
             (
                 RuntimeState::Ready,
                 RuntimeRoute::LocalSidecar,
                 format!(
-                    "Local GGUF sidecar route is ready. Prompts stay local and run through Rust-supervised llama-cli.{benchmark_note}"
+                    "Local GGUF sidecar route is ready. Prompts stay local and run through Rust-supervised llama-cli.{benchmark_note}{backend_note}"
                 ),
             )
         }
@@ -132,6 +160,14 @@ fn build_runtime_status(
             "Local Brain is not configured. Cyro will use the local mock fallback.".to_string(),
         ),
     };
+    let runtime_state = if matches!(
+        generation.state,
+        GenerationState::Starting | GenerationState::Streaming | GenerationState::Cancelling
+    ) {
+        RuntimeState::Generating
+    } else {
+        base_runtime_state
+    };
 
     RuntimeStatus {
         health: "ok",
@@ -147,10 +183,15 @@ fn build_runtime_status(
         runtime_state,
         active_route,
         route_explanation: route_explanation.to_string(),
+        backend_mode,
+        cpu_fallback_active: backend_mode.cpu_fallback_applied(),
         sidecar,
         local_model,
         model_registry,
         benchmark,
+        generation_state: generation.state,
+        active_generation_id: generation.active_generation_id,
+        last_finish_reason: generation.last_finish_reason,
         last_error: None,
         network: "disabled",
         vault: "not_indexed",
@@ -158,6 +199,150 @@ fn build_runtime_status(
         sync: "disabled",
         privacy: "offline",
     }
+}
+
+#[tauri::command]
+fn send_local_prompt_streaming(
+    prompt: String,
+    mode: RuntimeMode,
+    model_id: Option<String>,
+    max_tokens: Option<u32>,
+    temperature: Option<f32>,
+    privacy_mode: Option<String>,
+    stream: Option<bool>,
+    app: tauri::AppHandle,
+    model_registry: tauri::State<'_, model_registry::ModelRegistryState>,
+    sidecar_state: tauri::State<'_, sidecar::SidecarState>,
+    generation_manager: tauri::State<'_, streaming::GenerationManager>,
+    backend_mode_state: tauri::State<'_, BackendModeState>,
+) -> Result<streaming::StreamingPromptResult, RuntimeError> {
+    let _ = temperature;
+    let _ = privacy_mode;
+    let _ = stream;
+
+    if prompt.trim().is_empty() {
+        return Err(RuntimeError::recoverable(
+            "empty_prompt",
+            "Enter a prompt before sending.",
+            "Type a local prompt and try again.",
+            None,
+        ));
+    }
+
+    if prompt.trim() == "/fail" {
+        return Err(RuntimeError::recoverable(
+            "mocked_command_failure",
+            "Sprint 0 mocked command failure.",
+            "Use any prompt other than /fail.",
+            None,
+        ));
+    }
+
+    let sidecar_path = sidecar::configured_llama_cli_path(&sidecar_state).map_err(|message| {
+        RuntimeError::recoverable(
+            "sidecar_state_unavailable",
+            "Cyro could not read local sidecar state.",
+            "Retry after configuring the local sidecar path.",
+            Some(message),
+        )
+    })?;
+    let model_entry = model_registry
+        .get_model_entry(model_id.as_deref())
+        .map_err(|message| {
+            RuntimeError::recoverable(
+                "model_registry_unavailable",
+                "Cyro could not read local model registry state.",
+                "Retry after validating the local GGUF model path.",
+                Some(message),
+            )
+        })?;
+
+    let Some(sidecar_path) = sidecar_path else {
+        if model_entry
+            .as_ref()
+            .and_then(|entry| entry.file_path.as_ref())
+            .is_none()
+        {
+            let mock = mocked_local_prompt_response(mode);
+            return Ok(streaming::StreamingPromptResult {
+                generation_id: "mock:fallback".to_string(),
+                final_text: mock.response,
+                finish_reason: mock.finish_reason,
+                elapsed_ms: mock.elapsed_ms,
+                route: mock.route,
+                model_id: mock.model_id,
+                cancelled: false,
+                timed_out: false,
+                error: None,
+            });
+        }
+
+        return Err(RuntimeError::recoverable(
+            "sidecar_not_configured",
+            "No validated llama-cli sidecar path is configured.",
+            "Configure a local llama-cli path before sending a real local GGUF prompt.",
+            None,
+        ));
+    };
+
+    let Some(model_entry) = model_entry else {
+        return Err(RuntimeError::recoverable(
+            "model_not_registered",
+            "The requested local model is not registered.",
+            "Use the qwen-0_8b-local placeholder model entry for this proof.",
+            None,
+        ));
+    };
+
+    let Some(model_path) = model_entry.file_path.as_deref() else {
+        return Err(RuntimeError::recoverable(
+            "model_not_configured",
+            "No validated GGUF model path is configured.",
+            "Configure a local .gguf model path before sending a real local prompt.",
+            None,
+        ));
+    };
+
+    let sidecar_status = sidecar::validate_sidecar_path_value(&sidecar_path);
+    if sidecar_status.state != sidecar::SidecarBinaryState::Available {
+        return Err(RuntimeError::recoverable(
+            "sidecar_invalid",
+            &sidecar_status.message,
+            &sidecar_status.user_action,
+            None,
+        ));
+    }
+
+    let model_validation = model_registry::validate_model_path_value(model_path);
+    if !model_validation.valid {
+        return Err(RuntimeError::recoverable(
+            "model_invalid",
+            &model_validation.message,
+            &model_validation.user_action,
+            None,
+        ));
+    }
+
+    let backend_mode = backend_mode_state.current_mode()?;
+    let request = LlamaCliRequest::new_with_backend_mode(
+        sidecar_path,
+        model_path.to_string(),
+        prompt.trim().to_string(),
+        sanitize_max_tokens(max_tokens),
+        backend_mode,
+    );
+    let model_id = Some(model_entry.model_id);
+    let app_handle = app.clone();
+
+    streaming::run_streaming_llama_cli_prompt(
+        &request,
+        mode,
+        model_id,
+        &generation_manager,
+        move |event| {
+            let _ = app_handle.emit(streaming::LOCAL_PROMPT_STREAM_EVENT, event);
+        },
+    )
 }
 
 #[tauri::command]
@@ -170,6 +355,7 @@ fn send_local_prompt(
     privacy_mode: Option<String>,
     model_registry: tauri::State<'_, model_registry::ModelRegistryState>,
     sidecar_state: tauri::State<'_, sidecar::SidecarState>,
+    backend_mode_state: tauri::State<'_, BackendModeState>,
 ) -> Result<LocalPromptResponse, RuntimeError> {
     let _ = temperature;
     let _ = privacy_mode;
@@ -266,11 +452,13 @@ fn send_local_prompt(
         ));
     }
 
-    let request = LlamaCliRequest::new(
+    let backend_mode = backend_mode_state.current_mode()?;
+    let request = LlamaCliRequest::new_with_backend_mode(
         sidecar_path,
         model_path.to_string(),
         prompt.trim().to_string(),
         sanitize_max_tokens(max_tokens),
+        backend_mode,
     );
     let output = run_llama_cli_prompt(&request)?;
 
@@ -296,12 +484,17 @@ pub fn run() {
             sidecar::get_sidecar_status,
             sidecar::set_sidecar_path,
             sidecar::validate_sidecar_path,
+            llama_cli::set_runtime_backend_mode,
             benchmark::run_runtime_benchmark,
-            send_local_prompt
+            send_local_prompt,
+            send_local_prompt_streaming,
+            streaming::cancel_generation
         ])
         .manage(model_registry::ModelRegistryState::default())
         .manage(sidecar::SidecarState::default())
         .manage(benchmark::BenchmarkState::default())
+        .manage(BackendModeState::default())
+        .manage(streaming::GenerationManager::default())
         .run(tauri::generate_context!())
         .expect("failed to run Cyro Sprint 0 desktop shell");
 }
@@ -309,6 +502,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::build_runtime_status;
+    use crate::llama_cli::RuntimeBackendMode;
     use crate::{
         model_registry::{
             apply_model_path_to_registry, initial_model_registry, validate_model_path_value,
@@ -328,6 +522,8 @@ mod tests {
             crate::sidecar::default_sidecar_status(),
             initial_model_registry(),
             crate::benchmark::default_benchmark_status(),
+            crate::streaming::default_generation_snapshot(),
+            RuntimeBackendMode::Auto,
         );
 
         assert_eq!(status.runtime_state, RuntimeState::NotConfigured);
@@ -349,6 +545,8 @@ mod tests {
             sidecar,
             registry,
             crate::benchmark::default_benchmark_status(),
+            crate::streaming::default_generation_snapshot(),
+            RuntimeBackendMode::Auto,
         );
 
         assert_eq!(status.runtime_state, RuntimeState::Ready);
@@ -367,6 +565,8 @@ mod tests {
             sidecar,
             initial_model_registry(),
             crate::benchmark::default_benchmark_status(),
+            crate::streaming::default_generation_snapshot(),
+            RuntimeBackendMode::Auto,
         );
 
         assert_eq!(status.runtime_state, RuntimeState::SidecarReady);
@@ -374,6 +574,39 @@ mod tests {
         assert!(status
             .route_explanation
             .contains("Configure a readable local GGUF"));
+    }
+
+    #[test]
+    fn runtime_status_reports_active_streaming_generation() {
+        let sandbox = TestSandbox::new("streaming");
+        let binary = sandbox.write_executable("llama-cli", "#!/bin/sh\nexit 0\n");
+        let model_path = sandbox.write_file("qwen-test.gguf", b"gguf placeholder");
+        let sidecar = validate_sidecar_path_value(path_str(&binary));
+        let validation = validate_model_path_value(path_str(&model_path));
+        let mut registry = initial_model_registry();
+        apply_model_path_to_registry(&mut registry, "qwen-0_8b-local", validation).unwrap();
+
+        let status = build_runtime_status(
+            sidecar,
+            registry,
+            crate::benchmark::default_benchmark_status(),
+            crate::streaming::GenerationSnapshot {
+                state: crate::runtime_types::GenerationState::Streaming,
+                active_generation_id: Some("generation:1".to_string()),
+                last_finish_reason: None,
+                elapsed_ms: Some(10),
+            },
+            RuntimeBackendMode::Cpu,
+        );
+
+        assert_eq!(status.runtime_state, RuntimeState::Generating);
+        assert_eq!(status.backend_mode, RuntimeBackendMode::Cpu);
+        assert!(status.cpu_fallback_active);
+        assert_eq!(
+            status.generation_state,
+            crate::runtime_types::GenerationState::Streaming
+        );
+        assert_eq!(status.active_generation_id.as_deref(), Some("generation:1"));
     }
 
     struct TestSandbox {

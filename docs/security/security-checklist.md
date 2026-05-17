@@ -66,13 +66,16 @@
 - [ ] Rust launches `llama-cli` with structured `Command` args only
 - [ ] No shell command string, `shell=true`, or command concatenation is used
 - [ ] Frontend does not pass arbitrary sidecar args
-- [ ] `llama-cli` runs with fixed internal non-interactive/offline flags, not user-provided args
+- [ ] `llama-cli` runs in one-shot `-m <model> -p <prompt> -n <maxTokens> --single-turn` mode, not interactive REPL mode
+- [ ] Rust sets child `current_dir` to the validated sidecar binary parent directory before launch
+- [ ] Rust passes structured args and closes child stdin; it does not use shell strings or user-provided sidecar flags
+- [ ] `CYRO_LLAMA_CLI_CPU_FALLBACK=1` may append `--device none` only for development/manual validation when Metal fails under the native launch context; it is not a product default
 - [ ] Prompt content is not logged by default
 - [ ] Sidecar prompt execution has a timeout
 - [ ] Timeout kills or reaps the child process
 - [ ] Nonzero exit returns an actionable runtime error
 - [ ] Stderr/debug output is bounded and prompt-redacted before surfacing
-- [ ] Streaming and cancellation UX remain future work
+- [ ] Non-streaming prompt execution remains available when streaming is not used
 
 ## Runtime Setup UI
 - [ ] Sidecar path validation is invoked through Rust/Tauri only
@@ -100,10 +103,15 @@
 - [ ] Rust/Tauri owns sidecar child process lifecycle, stdout reading, stderr reading, cancellation, timeout, and cleanup
 - [ ] React does not spawn, supervise, terminate, or directly control the sidecar process
 - [ ] Streaming uses Tauri events or an equivalent Rust-owned event channel
+- [ ] Tauri capabilities grant only `core:event:allow-listen` and `core:event:allow-unlisten` for the main window streaming listener; frontend event emit permissions remain blocked
+- [ ] Rust strips `llama-cli` banner, REPL prompt markers, available-command help, timing footer, and exit text before stdout reaches chat or benchmark UI
+- [ ] Empty-output diagnostics expose safe stdout shape counts and bounded prompt-redacted stderr, not raw prompt content
+- [ ] Streaming event payloads use `started`, `delta`, `completed`, `cancelled`, `timeout`, and `error`
 - [ ] Non-streaming prompt execution remains available as a fallback
 - [ ] Only one local generation can be active at a time
 - [ ] Send is blocked while generation state is `starting`, `streaming`, or `cancelling`
 - [ ] `cancel_generation` terminates the active Rust-owned child process and clears generating state
+- [ ] `CYRO_STREAM_TEST_SLOW=1` is allowed only as an explicit development/manual cancel validation hook; normal runtime must have no artificial streaming delay, and deterministic manual Cancel proof is deferred to CYRO-0011C
 - [ ] Timeout terminates or force-kills the child process and clears generating state
 - [ ] child process cleanup is verified for cancel, timeout, process failure, and app-side failure paths
 - [ ] No shell command string, `shell=true`, command concatenation, or frontend-provided sidecar args are used
