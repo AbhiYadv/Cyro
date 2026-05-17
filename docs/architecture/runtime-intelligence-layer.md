@@ -110,6 +110,7 @@ Inputs:
 - benchmark store data
 - local model evaluation matrix data
 - quality gate status
+- competitive model ranking evidence
 - active `GenerationState`
 - user runtime settings
 - privacy and Local Only state
@@ -166,6 +167,8 @@ Benchmarks are local-first. Cloud telemetry or background upload is out of scope
 
 Runtime Governor must surface benchmark status when available, but CYRO-0009 does not make Fast, Think, or Pro fully dependent on benchmark results yet. CYRO-0010 adds quality evidence requirements for local model candidates. Future CYRO-0011 work can consume benchmark evidence for streaming policy and routing decisions.
 
+CYRO-MODEL-001 adds competitive ranking evidence for Qwen and MiniCPM families. Runtime Governor must consume the resulting ranking records before promoting a primary local model candidate. Fast, Think, and Pro route selection must use benchmark evidence plus quality score, instruction-following score, resource score, and stability score; brand family alone is never a routing reason.
+
 ## Model Quality Gate
 
 Runtime Intelligence must require model quality evidence before selecting a model as a default Fast, Think, or Pro route.
@@ -178,6 +181,8 @@ Quality gate inputs:
 - technical accuracy score
 - instruction following score
 - crispness score
+- weighted ranking score
+- model family comparison set
 - manual memory/resource observations
 - benchmark latency class
 - recommended route
@@ -198,6 +203,8 @@ Policy:
 - `blocked_latency` prevents default route selection even when answer quality is acceptable.
 - `needs_more_testing` keeps the candidate visible as an experiment, not a production default.
 - `candidate_fast`, `candidate_think`, and `candidate_pro_later` require explicit benchmark and quality evidence.
+- `primary_fast_candidate`, `primary_think_candidate`, and `pro_later_candidate` require benchmark, quality, resource, and stability evidence from the competitive ranking matrix.
+- Qwen and MiniCPM candidates must be compared under the same fixed prompts and benchmark thresholds before either family can become the primary local model.
 
 ## Generation State and Cancellation Signals
 

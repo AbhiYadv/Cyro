@@ -25,18 +25,53 @@ The model answered quickly, but incorrectly explained PostgreSQL PITR. PITR must
 
 ## Candidate Ladder
 
-| Class | Role | Status | Initial Route |
-|---|---|---|---|
-| 0.5B | Pipeline proof only | Not production default | none |
-| 0.8B or nearest small Qwen instruct GGUF | Fast local candidate | Evaluate | fast |
-| 1.5B Q4/IQ | Think candidate for capable phone/laptop | Evaluate | think |
-| 3B Q4/IQ | Future laptop/Pro candidate | Benchmark-gated later | pro_later |
+| Family | Class | Role | Status | Initial Route |
+|---|---|---|---|---|
+| Qwen | 0.5B | Pipeline proof only | Not production default | none |
+| Qwen | 0.8B or nearest small instruct GGUF | Fast local candidate | Evaluate | fast |
+| Qwen | 1.5B Q4/IQ | Think candidate for capable phone/laptop | Evaluate | think |
+| Qwen | 3B Q4/IQ | Future laptop/Pro candidate | Benchmark-gated later | pro_later |
+| MiniCPM | edge-efficient small GGUF | Fast/Think challenger candidate | Evaluate | fast |
+| MiniCPM-V | 4.6 GGUF or nearest local multimodal-compatible GGUF | Future multimodal/document candidate | Evaluate later | pro_later |
 
 Candidate policy:
 - 0.5B can validate path, subprocess, timeout, and benchmark plumbing only.
 - 0.8B or nearest small Qwen instruct GGUF is the first plausible Fast candidate.
 - 1.5B Q4/IQ is the first Think candidate after resource and quality gates.
 - 3B Q4/IQ is a future laptop or Pro candidate and must remain benchmark-gated.
+- MiniCPM and MiniCPM-V are formal challengers to Qwen, not secondary afterthoughts.
+- MiniCPM-V 4.6 GGUF availability and `llama.cpp`/Ollama support claims are treated as upstream hypotheses until Cyro validates a user-provided local GGUF through the same benchmark and quality matrix.
+
+## Competitive Ranking Policy
+
+Best measured model becomes primary. Qwen and MiniCPM compete under the same benchmark, quality, resource, and stability gates. Cyro must not select the primary local model by brand preference.
+
+No primary Fast, Think, or future Pro local model is selected until benchmark and quality gates pass. The current Qwen 0.5B proof remains `pipeline_only`.
+
+Weighted score:
+
+| Score component | Weight | Evidence source |
+|---|---:|---|
+| Quality score | 35 | fixed prompt correctness, hallucination checks, technical accuracy |
+| Latency score | 25 | CYRO-0009 local benchmark elapsed time and latency class |
+| Instruction-following score | 15 | fixed prompt format compliance and task adherence |
+| Resource score | 15 | manual RAM, cold start, battery, and thermal observations |
+| Stability score | 10 | repeated runs, nonzero exits, empty-output events, timeout behavior |
+
+Decision outputs:
+- `primary_fast_candidate`
+- `primary_think_candidate`
+- `pro_later_candidate`
+- `blocked_quality`
+- `blocked_latency`
+- `pipeline_only`
+
+Ranking rules:
+- A candidate must pass minimum quality thresholds before latency can make it primary.
+- A fast but technically wrong model remains `pipeline_only` or `blocked_quality`.
+- A high-quality but too-slow model may remain `candidate_pro_later` or `blocked_latency`.
+- MiniCPM and Qwen candidate records must use the same prompt set, benchmark policy, and scoring weights.
+- Multimodal/document candidates such as MiniCPM-V remain future candidates until Cyro has a document/multimodal evaluation harness.
 
 ## Quantization Policy
 
@@ -51,6 +86,7 @@ No model download, model browser, marketplace, or auto-download behavior is auth
 
 Every candidate evaluation record must include:
 - `modelId`
+- `family`
 - `fileName`
 - `parameterClass`
 - `quantization`
@@ -64,6 +100,7 @@ Every candidate evaluation record must include:
 - `technicalAccuracyScore`
 - `instructionFollowingScore`
 - `crispnessScore`
+- `weightedScore`
 - `recommendedRoute`
 - `decision`
 - `notes`
@@ -73,6 +110,9 @@ Allowed `decision` values:
 - `candidate_fast`
 - `candidate_think`
 - `candidate_pro_later`
+- `primary_fast_candidate`
+- `primary_think_candidate`
+- `pro_later_candidate`
 - `blocked_quality`
 - `blocked_latency`
 - `needs_more_testing`
@@ -98,6 +138,7 @@ Quality gate:
 - technical accuracy must be tested with fixed prompts
 - instruction following must be tested with fixed prompts
 - crispness must be tested with fixed prompts
+- generic questions, writing/email drafting, planning/task breakdown, coding explanation/debugging, technical ops, and Cyro architecture prompts must be represented before promotion
 - failures must block default-route selection even when latency is fast
 - no broad quality claims are allowed until candidates are tested
 
@@ -160,12 +201,14 @@ Expected quality:
 
 ## Matrix Template
 
-| modelId | parameterClass | quantization | latencyClass | technicalAccuracyScore | instructionFollowingScore | crispnessScore | recommendedRoute | decision | notes |
-|---|---|---|---|---:|---:|---:|---|---|---|
-| qwen-0_5b-pipeline-proof | 0.5B | Q4_K_M | fast | 1 | 2 | 2 | none | pipeline_only | Fast local runtime proof; blocked as default because technical answer quality failed |
-| qwen-0_8b-local-candidate | 0.8B | Q4_K_M | TBD | TBD | TBD | TBD | fast | needs_more_testing | First Fast candidate to test |
-| qwen-1_5b-think-candidate | 1.5B | Q4/IQ | TBD | TBD | TBD | TBD | think | needs_more_testing | Think candidate for capable phone/laptop |
-| qwen-3b-pro-later-candidate | 3B | Q4/IQ | TBD | TBD | TBD | TBD | pro_later | needs_more_testing | Future laptop/Pro candidate |
+| modelId | family | parameterClass | quantization | latencyClass | technicalAccuracyScore | instructionFollowingScore | crispnessScore | weightedScore | recommendedRoute | decision | notes |
+|---|---|---|---|---|---:|---:|---:|---:|---|---|---|
+| qwen-0_5b-pipeline-proof | Qwen | 0.5B | Q4_K_M | fast | 1 | 2 | 2 | TBD | none | pipeline_only | Fast local runtime proof; blocked as default because technical answer quality failed |
+| qwen-0_8b-local-candidate | Qwen | 0.8B | Q4_K_M | TBD | TBD | TBD | TBD | TBD | fast | needs_more_testing | First Qwen Fast candidate to test |
+| qwen-1_5b-think-candidate | Qwen | 1.5B | Q4/IQ | TBD | TBD | TBD | TBD | TBD | think | needs_more_testing | Qwen Think candidate for capable phone/laptop |
+| qwen-3b-pro-later-candidate | Qwen | 3B | Q4/IQ | TBD | TBD | TBD | TBD | TBD | pro_later | needs_more_testing | Future Qwen laptop/Pro candidate |
+| minicpm-fast-think-candidate | MiniCPM | small edge class | Q4/IQ TBD | TBD | TBD | TBD | TBD | TBD | fast | needs_more_testing | MiniCPM challenger; Think route remains possible if benchmark, quality, and resource evidence support it |
+| minicpm-v-4_6-document-candidate | MiniCPM-V | multimodal/document class | GGUF TBD | TBD | TBD | TBD | TBD | TBD | pro_later | needs_more_testing | Future document/multimodal candidate; upstream support claims must be locally validated |
 
 ## Non-Goals
 

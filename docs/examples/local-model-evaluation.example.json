@@ -2,11 +2,20 @@
   "schema": "cyro.localModelEvaluation.v1",
   "notes": [
     "Example records only. No GGUF files, model downloads, sidecar binaries, or cloud evaluation are included.",
-    "The 0.5B record is pipeline_only because speed passed but technical answer quality failed."
+    "The 0.5B record is pipeline_only because speed passed but technical answer quality failed.",
+    "Qwen and MiniCPM candidates are placeholders until benchmark plus quality gates pass. No winner is selected in this example."
   ],
+  "scoringWeights": {
+    "qualityScore": 35,
+    "latencyScore": 25,
+    "instructionFollowingScore": 15,
+    "resourceScore": 15,
+    "stabilityScore": 10
+  },
   "records": [
     {
       "modelId": "qwen-0_5b-pipeline-proof",
+      "family": "Qwen",
       "fileName": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
       "parameterClass": "0.5B",
       "quantization": "Q4_K_M",
@@ -20,12 +29,14 @@
       "technicalAccuracyScore": 1,
       "instructionFollowingScore": 2,
       "crispnessScore": 2,
+      "weightedScore": null,
       "recommendedRoute": "none",
       "decision": "pipeline_only",
       "notes": "Pipeline proof only. It incorrectly explained PostgreSQL PITR, so it is blocked from production default selection."
     },
     {
       "modelId": "qwen-0_8b-fast-candidate",
+      "family": "Qwen",
       "fileName": "TBD user-provided GGUF",
       "parameterClass": "0.8B",
       "quantization": "Q4_K_M",
@@ -39,12 +50,14 @@
       "technicalAccuracyScore": null,
       "instructionFollowingScore": null,
       "crispnessScore": null,
+      "weightedScore": null,
       "recommendedRoute": "fast",
       "decision": "needs_more_testing",
-      "notes": "First Fast candidate after 0.5B pipeline proof."
+      "notes": "Qwen Fast candidate after 0.5B pipeline proof."
     },
     {
       "modelId": "qwen-1_5b-think-candidate",
+      "family": "Qwen",
       "fileName": "TBD user-provided GGUF",
       "parameterClass": "1.5B",
       "quantization": "Q4/IQ",
@@ -58,9 +71,73 @@
       "technicalAccuracyScore": null,
       "instructionFollowingScore": null,
       "crispnessScore": null,
+      "weightedScore": null,
       "recommendedRoute": "think",
       "decision": "needs_more_testing",
-      "notes": "Candidate for capable phone/laptop after benchmark and quality gates."
+      "notes": "Qwen Think candidate for capable phone/laptop after benchmark and quality gates."
+    },
+    {
+      "modelId": "qwen-3b-pro-later-candidate",
+      "family": "Qwen",
+      "fileName": "TBD user-provided GGUF",
+      "parameterClass": "3B",
+      "quantization": "Q4/IQ",
+      "fileSizeMb": null,
+      "configuredPath": "user-local path only",
+      "benchmarkElapsedMs": null,
+      "latencyClass": "unknown",
+      "tokenEstimate": null,
+      "coldStartObservation": "not tested",
+      "memoryObservationManual": "not tested",
+      "technicalAccuracyScore": null,
+      "instructionFollowingScore": null,
+      "crispnessScore": null,
+      "weightedScore": null,
+      "recommendedRoute": "pro_later",
+      "decision": "needs_more_testing",
+      "notes": "Future Qwen laptop/Pro candidate. Not eligible until benchmark, quality, and resource gates pass."
+    },
+    {
+      "modelId": "minicpm-fast-think-candidate",
+      "family": "MiniCPM",
+      "fileName": "TBD user-provided GGUF",
+      "parameterClass": "small edge class",
+      "quantization": "Q4/IQ TBD",
+      "fileSizeMb": null,
+      "configuredPath": "user-local path only",
+      "benchmarkElapsedMs": null,
+      "latencyClass": "unknown",
+      "tokenEstimate": null,
+      "coldStartObservation": "not tested",
+      "memoryObservationManual": "not tested",
+      "technicalAccuracyScore": null,
+      "instructionFollowingScore": null,
+      "crispnessScore": null,
+      "weightedScore": null,
+      "recommendedRoute": "fast",
+      "decision": "needs_more_testing",
+      "notes": "MiniCPM challenger for Fast/Think routes. No winner is selected until it competes against Qwen under the same scoring matrix."
+    },
+    {
+      "modelId": "minicpm-v-4_6-document-candidate",
+      "family": "MiniCPM-V",
+      "fileName": "TBD user-provided GGUF",
+      "parameterClass": "multimodal/document class",
+      "quantization": "GGUF TBD",
+      "fileSizeMb": null,
+      "configuredPath": "user-local path only",
+      "benchmarkElapsedMs": null,
+      "latencyClass": "unknown",
+      "tokenEstimate": null,
+      "coldStartObservation": "not tested",
+      "memoryObservationManual": "not tested",
+      "technicalAccuracyScore": null,
+      "instructionFollowingScore": null,
+      "crispnessScore": null,
+      "weightedScore": null,
+      "recommendedRoute": "pro_later",
+      "decision": "needs_more_testing",
+      "notes": "Future multimodal/document candidate. Upstream GGUF and llama.cpp/Ollama support claims are hypotheses until Cyro validates a local GGUF."
     }
   ]
 }
