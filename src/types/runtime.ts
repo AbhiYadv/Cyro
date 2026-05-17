@@ -2,6 +2,7 @@ import type { ModelRegistryEntry } from "./modelRegistry";
 import type { SidecarBinaryStatus } from "./sidecar";
 
 export type RuntimeMode = "fast" | "thinking";
+export type RuntimeBackendMode = "auto" | "cpu";
 export type RuntimeRoute = "local_mock" | "local_sidecar";
 export type RuntimeState = "not_configured" | "sidecar_ready" | "model_valid" | "ready" | "generating" | "error";
 export type FinishReason = "completed" | "mock_fallback" | "cancelled" | "timed_out" | "error";
@@ -40,6 +41,8 @@ export type RuntimeStatus = {
   runtimeState: RuntimeState;
   activeRoute: RuntimeRoute;
   routeExplanation: string;
+  backendMode: RuntimeBackendMode;
+  cpuFallbackActive: boolean;
   sidecar: SidecarBinaryStatus;
   localModel: ModelRegistryEntry | null;
   modelRegistry: ModelRegistryEntry[];

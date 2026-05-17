@@ -475,7 +475,8 @@ textarea:disabled {
   gap: 0.5rem;
 }
 
-.runtime-config input {
+.runtime-config input,
+.runtime-config select {
   min-width: 0;
   width: 100%;
   border: 1px solid var(--line);
@@ -486,7 +487,8 @@ textarea:disabled {
   outline: none;
 }
 
-.runtime-config input:focus {
+.runtime-config input:focus,
+.runtime-config select:focus {
   border-color: rgba(34, 211, 238, 0.55);
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
 }

@@ -883,7 +883,7 @@ mod tests {
         run_streaming_llama_cli_prompt, GenerationManager, GenerationState, StreamEventType,
     };
     use crate::{
-        llama_cli::LlamaCliRequest,
+        llama_cli::{LlamaCliRequest, RuntimeBackendMode},
         runtime_types::{FinishReason, RuntimeMode},
     };
     use std::{
@@ -1164,7 +1164,7 @@ mod tests {
             prompt: prompt.to_string(),
             max_tokens: 24,
             timeout,
-            cpu_fallback: false,
+            backend_mode: RuntimeBackendMode::Auto,
         }
     }
 

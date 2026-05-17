@@ -10,6 +10,7 @@ import type {
   RuntimeBenchmarkResult,
   RuntimeCommandError,
   RuntimeMode,
+  RuntimeBackendMode,
   RuntimeStatus,
   StreamingPromptResult
 } from "../types/runtime";
@@ -27,6 +28,8 @@ const mockedRuntimeStatus: RuntimeStatus = {
   runtimeState: "not_configured",
   activeRoute: "local_mock",
   routeExplanation: "Local Brain is not configured. Cyro will use the local mock fallback.",
+  backendMode: "auto",
+  cpuFallbackActive: false,
   sidecar: mockedSidecarStatus,
   localModel: placeholderModelRegistry[0],
   modelRegistry: placeholderModelRegistry,
@@ -117,6 +120,10 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
     throw new Error("Runtime benchmark requires the native Tauri app with validated local sidecar and model paths.");
   }
 
+  if (command === "set_runtime_backend_mode") {
+    return (args?.mode ?? "auto") as T;
+  }
+
   throw new Error(`Unknown Sprint 0 command: ${command}`);
 }
 
@@ -191,6 +198,10 @@ export async function runRuntimeBenchmark(mode: RuntimeMode, invoker: TauriInvok
     maxTokens: 80,
     timeoutMs: 60_000
   });
+}
+
+export async function setRuntimeBackendMode(mode: RuntimeBackendMode, invoker: TauriInvoker = defaultInvoker) {
+  return invoker<RuntimeBackendMode>("set_runtime_backend_mode", { mode });
 }
 
 export function formatRuntimeError(error: unknown, fallback = "The local runtime command failed.") {

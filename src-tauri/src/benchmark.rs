@@ -3,7 +3,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::llama_cli::{
-    dev_cpu_fallback_enabled, extract_elapsed_ms_from_debug, run_llama_cli_prompt, LlamaCliRequest,
+    extract_elapsed_ms_from_debug, run_llama_cli_prompt, BackendModeState, LlamaCliRequest,
+    RuntimeBackendMode,
 };
 use crate::model_registry::{
     validate_model_path_value, ModelRegistryEntry, ModelRegistryState, PLACEHOLDER_MODEL_ID,
@@ -149,6 +150,7 @@ pub fn run_runtime_benchmark(
     model_registry: tauri::State<'_, ModelRegistryState>,
     sidecar_state: tauri::State<'_, SidecarState>,
     benchmark_state: tauri::State<'_, BenchmarkState>,
+    backend_mode_state: tauri::State<'_, BackendModeState>,
 ) -> Result<RuntimeBenchmarkResult, RuntimeError> {
     let request = RuntimeBenchmarkRequest {
         model_id,
@@ -228,7 +230,9 @@ pub fn run_runtime_benchmark(
         return Ok(result);
     }
 
-    let llama_request = build_benchmark_llama_cli_request(&request, &sidecar_path, &model_path);
+    let backend_mode = backend_mode_state.current_mode()?;
+    let llama_request =
+        build_benchmark_llama_cli_request(&request, &sidecar_path, &model_path, backend_mode);
     let result = match run_llama_cli_prompt(&llama_request) {
         Ok(output) => {
             benchmark_success_result(&request, &model_entry, output.elapsed_ms, &output.response)
@@ -244,6 +248,7 @@ fn build_benchmark_llama_cli_request(
     request: &RuntimeBenchmarkRequest,
     binary_path: &str,
     model_path: &str,
+    backend_mode: RuntimeBackendMode,
 ) -> LlamaCliRequest {
     LlamaCliRequest {
         binary_path: binary_path.to_string(),
@@ -251,7 +256,7 @@ fn build_benchmark_llama_cli_request(
         prompt: BENCHMARK_PROMPT.to_string(),
         max_tokens: sanitize_benchmark_max_tokens(request.max_tokens),
         timeout: Duration::from_millis(sanitize_benchmark_timeout_ms(request.timeout_ms)),
-        cpu_fallback: dev_cpu_fallback_enabled(),
+        backend_mode,
     }
 }
 
@@ -502,6 +507,7 @@ mod tests {
             &request(),
             "/usr/local/bin/llama-cli",
             "/tmp/model.gguf",
+            RuntimeBackendMode::Auto,
         );
         assert_eq!(llama_request.prompt, BENCHMARK_PROMPT);
         assert_eq!(llama_request.max_tokens, 80);
@@ -517,6 +523,23 @@ mod tests {
         assert!(args.contains(&"-p".to_string()));
         assert!(args.contains(&BENCHMARK_PROMPT.to_string()));
         assert!(!args.join(" ").contains("sh -c"));
+    }
+
+    #[test]
+    fn benchmark_request_can_use_cpu_backend_mode() {
+        let llama_request = build_benchmark_llama_cli_request(
+            &request(),
+            "/usr/local/bin/llama-cli",
+            "/tmp/model.gguf",
+            RuntimeBackendMode::Cpu,
+        );
+
+        assert_eq!(llama_request.backend_mode, RuntimeBackendMode::Cpu);
+        assert!(
+            crate::llama_cli::build_llama_cli_args_for_request(&llama_request)
+                .windows(2)
+                .any(|window| window == ["--device", "none"])
+        );
     }
 
     #[test]

@@ -4,6 +4,7 @@ import type {
   FinishReason,
   GenerationState,
   LatencyClass,
+  RuntimeBackendMode,
   RuntimeBenchmarkResult,
   RuntimeRoute,
   RuntimeState,
@@ -85,6 +86,14 @@ export function latencyClassLabel(latencyClass: LatencyClass) {
   };
 
   return labels[latencyClass];
+}
+
+export function backendModeLabel(mode: RuntimeBackendMode, cpuFallbackActive = false) {
+  if (cpuFallbackActive || mode === "cpu") {
+    return "CPU Fallback";
+  }
+
+  return "Auto";
 }
 
 export function routeExplanation(status: RuntimeStatus) {

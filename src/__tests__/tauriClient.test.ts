@@ -7,6 +7,7 @@ import {
   runRuntimeBenchmark,
   sendLocalPrompt,
   sendLocalPromptStreaming,
+  setRuntimeBackendMode,
   type TauriInvoker
 } from "../services/tauriClient";
 import type { LocalPromptStreamEvent } from "../types/runtime";
@@ -30,6 +31,8 @@ describe("tauriClient Sprint 0 contract", () => {
       modelName: null,
       runtimeState: "not_configured",
       activeRoute: "local_mock",
+      backendMode: "auto",
+      cpuFallbackActive: false,
       benchmark: {
         status: "not_run"
       },
@@ -184,6 +187,16 @@ describe("tauriClient Sprint 0 contract", () => {
       latencyClass: "acceptable",
       elapsedMs: 11_000
     });
+  });
+
+  it("invokes the native backend mode command with explicit CPU fallback", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("set_runtime_backend_mode");
+      expect(args).toEqual({ mode: "cpu" });
+      return "cpu" as T;
+    };
+
+    await expect(setRuntimeBackendMode("cpu", invoker)).resolves.toBe("cpu");
   });
 
   it("sends a mocked local prompt response with the selected mode", async () => {

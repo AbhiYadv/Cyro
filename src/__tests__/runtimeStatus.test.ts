@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   benchmarkStatusLabel,
+  backendModeLabel,
   composeActionableMessage,
   formatBenchmarkElapsed,
   formatBenchmarkTokens,
@@ -26,6 +27,8 @@ function status(overrides: Partial<RuntimeStatus> = {}): RuntimeStatus {
     runtimeState: "not_configured",
     activeRoute: "local_mock",
     routeExplanation: "Local Brain is not configured. Cyro will use the local mock fallback.",
+    backendMode: "auto",
+    cpuFallbackActive: false,
     sidecar: mockedSidecarStatus,
     localModel: placeholderModelRegistry[0],
     modelRegistry: placeholderModelRegistry,
@@ -82,6 +85,12 @@ describe("runtime status presentation helpers", () => {
     expect(routeLabel(current.activeRoute)).toBe("Local Sidecar");
     expect(isLocalRuntimeReady(current)).toBe(true);
     expect(isBenchmarkRunnable(current)).toBe(true);
+  });
+
+  it("labels backend mode and CPU fallback state", () => {
+    expect(backendModeLabel("auto")).toBe("Auto");
+    expect(backendModeLabel("cpu")).toBe("CPU Fallback");
+    expect(backendModeLabel("auto", true)).toBe("CPU Fallback");
   });
 
   it("labels benchmark states and formats latest benchmark result", () => {

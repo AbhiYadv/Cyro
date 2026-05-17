@@ -1,15 +1,93 @@
 use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::Mutex,
     thread,
     time::{Duration, Instant},
 };
+
+use serde::{Deserialize, Serialize};
 
 use crate::runtime_types::{FinishReason, RuntimeError};
 
 const DEFAULT_PROMPT_TIMEOUT_SECS: u64 = 60;
 pub(crate) const MAX_DEBUG_CHARS: usize = 1_200;
 const LLAMA_CLI_ONE_SHOT_ARGS: [&str; 1] = ["--single-turn"];
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeBackendMode {
+    Auto,
+    Cpu,
+}
+
+impl RuntimeBackendMode {
+    pub fn cpu_fallback_applied(self) -> bool {
+        self == RuntimeBackendMode::Cpu
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            RuntimeBackendMode::Auto => "auto",
+            RuntimeBackendMode::Cpu => "cpu",
+        }
+    }
+
+    fn default_for_process() -> Self {
+        if dev_cpu_fallback_enabled() {
+            RuntimeBackendMode::Cpu
+        } else {
+            RuntimeBackendMode::Auto
+        }
+    }
+}
+
+pub struct BackendModeState {
+    mode: Mutex<RuntimeBackendMode>,
+}
+
+impl Default for BackendModeState {
+    fn default() -> Self {
+        Self {
+            mode: Mutex::new(RuntimeBackendMode::default_for_process()),
+        }
+    }
+}
+
+impl BackendModeState {
+    pub fn current_mode(&self) -> Result<RuntimeBackendMode, RuntimeError> {
+        let mode = self.mode.lock().map_err(|_| {
+            RuntimeError::recoverable(
+                "backend_mode_state_locked",
+                "Runtime backend mode is unavailable.",
+                "Restart Cyro and try again.",
+                None,
+            )
+        })?;
+        Ok(*mode)
+    }
+
+    fn set_mode(&self, next_mode: RuntimeBackendMode) -> Result<RuntimeBackendMode, RuntimeError> {
+        let mut mode = self.mode.lock().map_err(|_| {
+            RuntimeError::recoverable(
+                "backend_mode_state_locked",
+                "Runtime backend mode is unavailable.",
+                "Restart Cyro and try again.",
+                None,
+            )
+        })?;
+        *mode = next_mode;
+        Ok(*mode)
+    }
+}
+
+#[tauri::command]
+pub fn set_runtime_backend_mode(
+    mode: RuntimeBackendMode,
+    backend_mode_state: tauri::State<'_, BackendModeState>,
+) -> Result<RuntimeBackendMode, RuntimeError> {
+    backend_mode_state.set_mode(mode)
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LlamaCliRequest {
@@ -18,7 +96,7 @@ pub struct LlamaCliRequest {
     pub prompt: String,
     pub max_tokens: u32,
     pub timeout: Duration,
-    pub cpu_fallback: bool,
+    pub backend_mode: RuntimeBackendMode,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -29,6 +107,7 @@ pub struct LlamaCliOutput {
 }
 
 impl LlamaCliRequest {
+    #[cfg(test)]
     pub fn new(binary_path: String, model_path: String, prompt: String, max_tokens: u32) -> Self {
         Self {
             binary_path,
@@ -36,8 +115,35 @@ impl LlamaCliRequest {
             prompt,
             max_tokens,
             timeout: Duration::from_secs(DEFAULT_PROMPT_TIMEOUT_SECS),
-            cpu_fallback: dev_cpu_fallback_enabled(),
+            backend_mode: RuntimeBackendMode::default_for_process(),
         }
+    }
+
+    pub fn new_with_backend_mode(
+        binary_path: String,
+        model_path: String,
+        prompt: String,
+        max_tokens: u32,
+        backend_mode: RuntimeBackendMode,
+    ) -> Self {
+        Self {
+            binary_path,
+            model_path,
+            prompt,
+            max_tokens,
+            timeout: Duration::from_secs(DEFAULT_PROMPT_TIMEOUT_SECS),
+            backend_mode,
+        }
+    }
+
+    fn launch_fingerprint(&self) -> String {
+        format!(
+            "backendMode={}; cpuFallbackApplied={}; argFingerprint=modelPathConfigured:true,promptRedacted:true,maxTokens:{},singleTurn:true,deviceNone:{}",
+            self.backend_mode.as_str(),
+            self.backend_mode.cpu_fallback_applied(),
+            self.max_tokens,
+            self.backend_mode.cpu_fallback_applied()
+        )
     }
 }
 
@@ -61,7 +167,7 @@ pub fn build_llama_cli_args(model_path: &str, prompt: &str, max_tokens: u32) -> 
 
 pub fn build_llama_cli_args_for_request(request: &LlamaCliRequest) -> Vec<String> {
     let mut args = build_llama_cli_args(&request.model_path, &request.prompt, request.max_tokens);
-    if request.cpu_fallback {
+    if request.backend_mode.cpu_fallback_applied() {
         args.extend(["--device".to_string(), "none".to_string()]);
     }
     args
@@ -109,8 +215,9 @@ pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput,
                     "The local llama.cpp sidecar exited with an error.",
                     "Check the configured model path and try a shorter local prompt.",
                     Some(format!(
-                        "exitStatus={}; elapsedMs={elapsed_ms}; {}",
+                        "exitStatus={}; elapsedMs={elapsed_ms}; {}; {}",
                         output.status,
+                        request.launch_fingerprint(),
                         empty_stdout_debug(&stdout, &stderr, &request.prompt)
                     )),
                 ));
@@ -126,8 +233,9 @@ pub fn run_llama_cli_prompt(request: &LlamaCliRequest) -> Result<LlamaCliOutput,
                     "The local llama.cpp sidecar returned no text.",
                     "Try a shorter prompt or a different validated GGUF model.",
                     Some(format!(
-                        "exitStatus={}; elapsedMs={elapsed_ms}; {}",
+                        "exitStatus={}; elapsedMs={elapsed_ms}; {}; {}",
                         output.status,
+                        request.launch_fingerprint(),
                         empty_stdout_debug(&stdout, &stderr, &request.prompt)
                     )),
                 ));
@@ -493,7 +601,7 @@ pub(crate) fn dev_cpu_fallback_enabled() -> bool {
 mod tests {
     use super::{
         build_llama_cli_args, build_llama_cli_args_for_request, llama_cli_working_dir,
-        run_llama_cli_prompt, sanitize_max_tokens, LlamaCliRequest,
+        run_llama_cli_prompt, sanitize_max_tokens, LlamaCliRequest, RuntimeBackendMode,
     };
     use std::{
         fs,
@@ -535,7 +643,7 @@ mod tests {
             prompt: "hello".to_string(),
             max_tokens: 24,
             timeout: Duration::from_secs(5),
-            cpu_fallback: true,
+            backend_mode: RuntimeBackendMode::Cpu,
         };
 
         assert_eq!(
@@ -553,6 +661,31 @@ mod tests {
             ]
         );
         assert!(!build_llama_cli_args_for_request(&request).contains(&"-ngl".to_string()));
+    }
+
+    #[test]
+    fn auto_backend_mode_does_not_add_cpu_fallback_args() {
+        let request = LlamaCliRequest {
+            binary_path: "/tools/llama-cli".to_string(),
+            model_path: "/models/qwen.gguf".to_string(),
+            prompt: "hello".to_string(),
+            max_tokens: 24,
+            timeout: Duration::from_secs(5),
+            backend_mode: RuntimeBackendMode::Auto,
+        };
+
+        assert_eq!(
+            build_llama_cli_args_for_request(&request),
+            vec![
+                "-m",
+                "/models/qwen.gguf",
+                "-p",
+                "hello",
+                "-n",
+                "24",
+                "--single-turn"
+            ]
+        );
     }
 
     #[test]
@@ -680,7 +813,7 @@ Exiting...
             prompt: "private prompt".to_string(),
             max_tokens: 8,
             timeout: Duration::from_secs(5),
-            cpu_fallback: false,
+            backend_mode: RuntimeBackendMode::Auto,
         };
 
         let error = run_llama_cli_prompt(&request).expect_err("nonzero script should fail");
@@ -709,7 +842,7 @@ Exiting...
             prompt: "private prompt".to_string(),
             max_tokens: 8,
             timeout: Duration::from_secs(5),
-            cpu_fallback: false,
+            backend_mode: RuntimeBackendMode::Auto,
         };
 
         let error = run_llama_cli_prompt(&request).expect_err("empty success should fail safely");
@@ -733,7 +866,7 @@ Exiting...
             prompt: "private prompt".to_string(),
             max_tokens: 8,
             timeout: Duration::from_secs(5),
-            cpu_fallback: false,
+            backend_mode: RuntimeBackendMode::Auto,
         };
 
         let error = run_llama_cli_prompt(&request).expect_err("empty failure should fail safely");
@@ -757,7 +890,7 @@ Exiting...
             prompt: "hello".to_string(),
             max_tokens: 8,
             timeout: Duration::from_millis(25),
-            cpu_fallback: false,
+            backend_mode: RuntimeBackendMode::Auto,
         };
 
         let error = run_llama_cli_prompt(&request).expect_err("sleeping script should time out");

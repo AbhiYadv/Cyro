@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { setModelPath, validateModelPath } from "../../services/modelRegistry";
 import {
   benchmarkStatusLabel,
+  backendModeLabel,
   composeActionableMessage,
   finishReasonLabel,
   formatBenchmarkElapsed,
@@ -15,9 +16,9 @@ import {
   runtimeStateLabel
 } from "../../services/runtimeStatus";
 import { setSidecarPath, validateSidecarPath } from "../../services/sidecar";
-import { formatRuntimeError, runRuntimeBenchmark } from "../../services/tauriClient";
+import { formatRuntimeError, runRuntimeBenchmark, setRuntimeBackendMode } from "../../services/tauriClient";
 import type { ModelPathValidationResult } from "../../types/modelRegistry";
-import type { RuntimeStatus } from "../../types/runtime";
+import type { RuntimeBackendMode, RuntimeStatus } from "../../types/runtime";
 import type { SidecarBinaryStatus } from "../../types/sidecar";
 
 type RuntimePanelProps = {
@@ -47,7 +48,7 @@ export function RuntimePanel({ status, onStatusRefresh }: RuntimePanelProps) {
   const [modelValidation, setModelValidation] = useState<ModelPathValidationResult | null>(null);
   const [configStatus, setConfigStatus] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
-  const [activeAction, setActiveAction] = useState<"sidecar" | "model" | "benchmark" | null>(null);
+  const [activeAction, setActiveAction] = useState<"sidecar" | "model" | "benchmark" | "backend" | null>(null);
   const runtimeReady = isLocalRuntimeReady(status);
   const benchmarkRunnable = isBenchmarkRunnable(status);
   const latestBenchmark = status.benchmark.latestResult;
@@ -57,6 +58,7 @@ export function RuntimePanel({ status, onStatusRefresh }: RuntimePanelProps) {
     ["Active Generation", status.activeGenerationId ?? "None"],
     ["Last Finish", finishReasonLabel(status.lastFinishReason)],
     ["Route", routeLabel(status.activeRoute)],
+    ["Backend", status.cpuFallbackActive ? "CPU Fallback Active" : backendModeLabel(status.backendMode)],
     ["Benchmark", benchmarkStatusLabel(status.benchmark.status)],
     ["Model", status.localModel?.validated ? status.localModel.displayName : "Not Configured"],
     ["Model File", formatModelFile(status.localModel)],
@@ -156,6 +158,22 @@ export function RuntimePanel({ status, onStatusRefresh }: RuntimePanelProps) {
     }
   }
 
+  async function handleBackendModeChange(nextMode: RuntimeBackendMode) {
+    setActiveAction("backend");
+    setConfigStatus(null);
+    setConfigError(null);
+
+    try {
+      const appliedMode = await setRuntimeBackendMode(nextMode);
+      await onStatusRefresh();
+      setConfigStatus(`Backend Mode: ${backendModeLabel(appliedMode)}`);
+    } catch (error) {
+      setConfigError(formatRuntimeError(error, "Backend mode update failed."));
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
   return (
     <aside className="runtime-panel" aria-label="Runtime panel">
       <div className="panel-header">
@@ -179,6 +197,23 @@ export function RuntimePanel({ status, onStatusRefresh }: RuntimePanelProps) {
 
       <section className="runtime-config" aria-label="Local Brain setup">
         <p className="eyebrow">Local Brain Setup</p>
+
+        <div className="runtime-path-form">
+          <label htmlFor="backend-mode">Backend mode</label>
+          <select
+            id="backend-mode"
+            aria-label="Runtime backend mode"
+            value={status.backendMode}
+            onChange={(event) => handleBackendModeChange(event.target.value as RuntimeBackendMode)}
+            disabled={activeAction !== null}
+          >
+            <option value="auto">Auto</option>
+            <option value="cpu">CPU fallback</option>
+          </select>
+          <span className="path-state">
+            {status.cpuFallbackActive ? "CPU fallback active. Rust appends --device none." : "Auto backend. No CPU fallback flag is applied."}
+          </span>
+        </div>
 
         <form className="runtime-path-form" onSubmit={handleSidecarValidation}>
           <label htmlFor="sidecar-path">Sidecar path</label>

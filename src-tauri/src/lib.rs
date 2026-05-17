@@ -7,7 +7,10 @@ mod runtime_types;
 mod sidecar;
 mod streaming;
 
-use llama_cli::{run_llama_cli_prompt, sanitize_max_tokens, LlamaCliRequest};
+use llama_cli::{
+    run_llama_cli_prompt, sanitize_max_tokens, BackendModeState, LlamaCliRequest,
+    RuntimeBackendMode,
+};
 use runtime_types::{
     mocked_local_prompt_response, FinishReason, GenerationState, LocalPromptResponse, RuntimeError,
     RuntimeMode, RuntimeRoute, RuntimeState,
@@ -29,6 +32,8 @@ struct RuntimeStatus {
     runtime_state: RuntimeState,
     active_route: RuntimeRoute,
     route_explanation: String,
+    backend_mode: RuntimeBackendMode,
+    cpu_fallback_active: bool,
     sidecar: sidecar::SidecarBinaryStatus,
     local_model: Option<model_registry::ModelRegistryEntry>,
     model_registry: Vec<model_registry::ModelRegistryEntry>,
@@ -55,6 +60,7 @@ fn get_runtime_status(
     sidecar_state: tauri::State<'_, sidecar::SidecarState>,
     benchmark_state: tauri::State<'_, benchmark::BenchmarkState>,
     generation_manager: tauri::State<'_, streaming::GenerationManager>,
+    backend_mode_state: tauri::State<'_, BackendModeState>,
 ) -> Result<RuntimeStatus, RuntimeError> {
     let sidecar = sidecar_state.current_status().map_err(|message| {
         RuntimeError::recoverable(
@@ -74,9 +80,14 @@ fn get_runtime_status(
     })?;
     let benchmark = benchmark_state.current_status()?;
     let generation = generation_manager.snapshot()?;
+    let backend_mode = backend_mode_state.current_mode()?;
 
     Ok(build_runtime_status(
-        sidecar, registry, benchmark, generation,
+        sidecar,
+        registry,
+        benchmark,
+        generation,
+        backend_mode,
     ))
 }
 
@@ -85,6 +96,7 @@ fn build_runtime_status(
     model_registry: Vec<model_registry::ModelRegistryEntry>,
     benchmark: benchmark::RuntimeBenchmarkStatus,
     generation: streaming::GenerationSnapshot,
+    backend_mode: RuntimeBackendMode,
 ) -> RuntimeStatus {
     let local_model = model_registry
         .iter()
@@ -118,11 +130,17 @@ fn build_runtime_status(
                 }
             };
 
+            let backend_note = if backend_mode.cpu_fallback_applied() {
+                " CPU fallback is active for native validation."
+            } else {
+                ""
+            };
+
             (
                 RuntimeState::Ready,
                 RuntimeRoute::LocalSidecar,
                 format!(
-                    "Local GGUF sidecar route is ready. Prompts stay local and run through Rust-supervised llama-cli.{benchmark_note}"
+                    "Local GGUF sidecar route is ready. Prompts stay local and run through Rust-supervised llama-cli.{benchmark_note}{backend_note}"
                 ),
             )
         }
@@ -165,6 +183,8 @@ fn build_runtime_status(
         runtime_state,
         active_route,
         route_explanation: route_explanation.to_string(),
+        backend_mode,
+        cpu_fallback_active: backend_mode.cpu_fallback_applied(),
         sidecar,
         local_model,
         model_registry,
@@ -194,6 +214,7 @@ fn send_local_prompt_streaming(
     model_registry: tauri::State<'_, model_registry::ModelRegistryState>,
     sidecar_state: tauri::State<'_, sidecar::SidecarState>,
     generation_manager: tauri::State<'_, streaming::GenerationManager>,
+    backend_mode_state: tauri::State<'_, BackendModeState>,
 ) -> Result<streaming::StreamingPromptResult, RuntimeError> {
     let _ = temperature;
     let _ = privacy_mode;
@@ -302,11 +323,13 @@ fn send_local_prompt_streaming(
         ));
     }
 
-    let request = LlamaCliRequest::new(
+    let backend_mode = backend_mode_state.current_mode()?;
+    let request = LlamaCliRequest::new_with_backend_mode(
         sidecar_path,
         model_path.to_string(),
         prompt.trim().to_string(),
         sanitize_max_tokens(max_tokens),
+        backend_mode,
     );
     let model_id = Some(model_entry.model_id);
     let app_handle = app.clone();
@@ -332,6 +355,7 @@ fn send_local_prompt(
     privacy_mode: Option<String>,
     model_registry: tauri::State<'_, model_registry::ModelRegistryState>,
     sidecar_state: tauri::State<'_, sidecar::SidecarState>,
+    backend_mode_state: tauri::State<'_, BackendModeState>,
 ) -> Result<LocalPromptResponse, RuntimeError> {
     let _ = temperature;
     let _ = privacy_mode;
@@ -428,11 +452,13 @@ fn send_local_prompt(
         ));
     }
 
-    let request = LlamaCliRequest::new(
+    let backend_mode = backend_mode_state.current_mode()?;
+    let request = LlamaCliRequest::new_with_backend_mode(
         sidecar_path,
         model_path.to_string(),
         prompt.trim().to_string(),
         sanitize_max_tokens(max_tokens),
+        backend_mode,
     );
     let output = run_llama_cli_prompt(&request)?;
 
@@ -458,6 +484,7 @@ pub fn run() {
             sidecar::get_sidecar_status,
             sidecar::set_sidecar_path,
             sidecar::validate_sidecar_path,
+            llama_cli::set_runtime_backend_mode,
             benchmark::run_runtime_benchmark,
             send_local_prompt,
             send_local_prompt_streaming,
@@ -466,6 +493,7 @@ pub fn run() {
         .manage(model_registry::ModelRegistryState::default())
         .manage(sidecar::SidecarState::default())
         .manage(benchmark::BenchmarkState::default())
+        .manage(BackendModeState::default())
         .manage(streaming::GenerationManager::default())
         .run(tauri::generate_context!())
         .expect("failed to run Cyro Sprint 0 desktop shell");
@@ -474,6 +502,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::build_runtime_status;
+    use crate::llama_cli::RuntimeBackendMode;
     use crate::{
         model_registry::{
             apply_model_path_to_registry, initial_model_registry, validate_model_path_value,
@@ -494,6 +523,7 @@ mod tests {
             initial_model_registry(),
             crate::benchmark::default_benchmark_status(),
             crate::streaming::default_generation_snapshot(),
+            RuntimeBackendMode::Auto,
         );
 
         assert_eq!(status.runtime_state, RuntimeState::NotConfigured);
@@ -516,6 +546,7 @@ mod tests {
             registry,
             crate::benchmark::default_benchmark_status(),
             crate::streaming::default_generation_snapshot(),
+            RuntimeBackendMode::Auto,
         );
 
         assert_eq!(status.runtime_state, RuntimeState::Ready);
@@ -535,6 +566,7 @@ mod tests {
             initial_model_registry(),
             crate::benchmark::default_benchmark_status(),
             crate::streaming::default_generation_snapshot(),
+            RuntimeBackendMode::Auto,
         );
 
         assert_eq!(status.runtime_state, RuntimeState::SidecarReady);
@@ -564,9 +596,12 @@ mod tests {
                 last_finish_reason: None,
                 elapsed_ms: Some(10),
             },
+            RuntimeBackendMode::Cpu,
         );
 
         assert_eq!(status.runtime_state, RuntimeState::Generating);
+        assert_eq!(status.backend_mode, RuntimeBackendMode::Cpu);
+        assert!(status.cpu_fallback_active);
         assert_eq!(
             status.generation_state,
             crate::runtime_types::GenerationState::Streaming
