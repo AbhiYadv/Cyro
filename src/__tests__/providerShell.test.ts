@@ -20,6 +20,36 @@ describe("provider shell state contract", () => {
     expect(shellComposerPlaceholder(next.selectedProvider)).toBe("Ask Claude");
   });
 
+  it("uses provider pill state rather than raw route select behavior", () => {
+    const chatgpt = providerShellReducer(defaultProviderShellState, {
+      type: "select_provider",
+      provider: "chatgpt"
+    });
+    const gemini = providerShellReducer(chatgpt, {
+      type: "select_provider",
+      provider: "gemini"
+    });
+
+    expect(chatgpt.selectedProvider).toBe("chatgpt");
+    expect(chatgpt.providerSurfaceStatus).toBe("blocked");
+    expect(gemini.selectedProvider).toBe("gemini");
+    expect(gemini.providerSurfaceStatus).toBe("unvalidated");
+  });
+
+  it("changes reasoning mode through pill state", () => {
+    const think = providerShellReducer(defaultProviderShellState, {
+      type: "select_reasoning",
+      reasoningMode: "think"
+    });
+    const pro = providerShellReducer(think, {
+      type: "select_reasoning",
+      reasoningMode: "pro"
+    });
+
+    expect(think.reasoningMode).toBe("think");
+    expect(pro.reasoningMode).toBe("pro");
+  });
+
   it("opens and closes the tools menu", () => {
     const open = providerShellReducer(defaultProviderShellState, { type: "toggle_tools" });
     const closed = providerShellReducer(open, { type: "close_tools" });

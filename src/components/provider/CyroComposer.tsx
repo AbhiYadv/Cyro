@@ -57,20 +57,19 @@ export function CyroComposer({
           <button type="button" className="composer-icon-button" onClick={onToolsToggle} aria-label="Open tools menu">
             +
           </button>
-          <label className="composer-select-label">
-            <span>Route</span>
-            <select
-              aria-label="Provider route"
-              value={selectedProvider}
-              onChange={(event) => onProviderChange(event.target.value as ProviderRouteId)}
-            >
-              {providerRouteOptions.map((route) => (
-                <option key={route.id} value={route.id}>
-                  {providerDisplayName(route.id)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="provider-pill-selector" aria-label="Provider route">
+            {providerRouteOptions.map((route) => (
+              <button
+                className={selectedProvider === route.id ? "provider-pill active" : "provider-pill"}
+                key={route.id}
+                type="button"
+                onClick={() => onProviderChange(route.id)}
+                aria-pressed={selectedProvider === route.id}
+              >
+                {providerDisplayName(route.id)}
+              </button>
+            ))}
+          </div>
           <div className="reasoning-selector" aria-label="Reasoning selector">
             {reasoningOptions.map((option) => (
               <button

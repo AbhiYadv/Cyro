@@ -13,6 +13,7 @@ describe("provider shell components", () => {
 
     expect(html).toContain("Iframe display is blocked");
     expect(html).toContain("blank or blocked iframe");
+    expect(html).toContain("CYRO-PROVIDER-010");
     expect(html).toContain("Tauri-native visible webview/session container");
     expect(html).toContain("Explicit fallback");
   });
@@ -58,5 +59,33 @@ describe("provider shell components", () => {
     expect(idleHtml).toContain("Ask Gemini");
     expect(idleHtml).toContain("Send");
     expect(streamingHtml).toContain("Stop");
+  });
+
+  it("renders provider and reasoning pill selectors instead of raw selects", () => {
+    const html = renderToString(
+      <CyroComposer
+        selectedProvider="chatgpt"
+        reasoningMode="think"
+        generationState="idle"
+        toolsOpen={false}
+        prompt=""
+        onPromptChange={noop}
+        onProviderChange={noop}
+        onReasoningChange={noop}
+        onToolsToggle={noop}
+        onToolsClose={noop}
+        onSend={noop}
+        onStop={noop}
+      />
+    );
+
+    expect(html).not.toContain("<select");
+    expect(html).not.toContain("<option");
+    expect(html).toContain("provider-pill active");
+    expect(html).toContain("Local");
+    expect(html).toContain("ChatGPT");
+    expect(html).toContain("Claude");
+    expect(html).toContain("Gemini");
+    expect(html).toContain("reasoning-pill active");
   });
 });

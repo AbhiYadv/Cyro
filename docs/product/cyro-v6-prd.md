@@ -130,9 +130,9 @@ The end-user product experience is that a user can choose ChatGPT, Claude, Gemin
 The composer contract is:
 - left-side plus button for documents and images
 - center Cyro message input
-- right-side provider selector defaulted to Local
-- provider options for Local, ChatGPT, Claude, and Gemini
-- reasoning selector for Fast, Think, and Pro
+- right-side segmented provider pills defaulted to Local
+- provider pill options for Local, ChatGPT, Claude, and Gemini
+- segmented reasoning pills for Fast, Think, and Pro
 - send button at the far right
 - visible Stop control while generation or handoff state is active
 
@@ -141,8 +141,10 @@ Final provider shell UX target:
 - compact top provider header showing Cyro, selected route, route status, and diagnostics access
 - left drawer for search, new chat, memory, vault, provider sessions, notebooks, and recent chats
 - bottom composer that remains visible for Local, ChatGPT, Claude, and Gemini routes
+- production-intent provider pills and reasoning pills in the composer, not raw dropdown controls
 - plus/tools tray for attach file, approved vault/memory placeholders, image creation placeholder, explicit provider-answer import placeholder, and settings
 - runtime status is diagnostic and collapsible; it must not dominate the main provider shell
+- iframe feasibility remains blocked for ChatGPT and unvalidated for Claude/Gemini; CYRO-PROVIDER-010 native container research is required before claiming embedded provider hosting works
 
 The composer has a route selector for:
 - Local

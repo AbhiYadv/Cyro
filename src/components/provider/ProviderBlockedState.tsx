@@ -44,9 +44,9 @@ export function ProviderBlockedState({ provider, status }: ProviderBlockedStateP
           : `${providerName} is available as a route in the shell prototype, but manual embedded-session validation is still pending.`}
       </p>
       <p>
-        Iframe embedding remains a feasibility result, not the final provider-shell solution. The next container work
-        must research a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or
-        response capture.
+        Iframe embedding remains a feasibility result, not the final provider-shell solution. CYRO-PROVIDER-010 must
+        validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response
+        capture.
       </p>
       <a className="provider-fallback-link" href={fallbackOrigins[provider]} target="_blank" rel="noreferrer">
         Explicit fallback
