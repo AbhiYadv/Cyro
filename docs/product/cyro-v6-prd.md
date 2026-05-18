@@ -138,6 +138,7 @@ The composer contract is:
 
 Final provider shell UX target:
 - one Cyro-owned chat surface, not a runtime configuration dashboard as the primary experience
+- local home state is minimal and composer-first: a simple Cyro presence line plus a Cyro-owned animated visual identity, not a marketing headline or copied character from another product
 - compact top provider header showing Cyro, selected route, route status, and diagnostics access
 - left drawer for search, new chat, memory, vault, provider sessions, notebooks, and recent chats
 - bottom composer that remains visible for Local, ChatGPT, Claude, and Gemini routes

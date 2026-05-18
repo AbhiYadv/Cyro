@@ -2,12 +2,77 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { CyroComposer } from "../components/provider/CyroComposer";
 import { CyroLeftDrawer } from "../components/provider/CyroLeftDrawer";
+import { CyroPresence } from "../components/provider/CyroPresence";
 import { ProviderBlockedState } from "../components/provider/ProviderBlockedState";
+import { ProviderShellLayout } from "../components/provider/ProviderShellLayout";
 import { ProviderToolsMenu } from "../components/provider/ProviderToolsMenu";
+import type { RuntimeStatus } from "../types/runtime";
 
 const noop = () => undefined;
+const noopAsync = async () => runtimeStatus;
+
+const runtimeStatus: RuntimeStatus = {
+  health: "ok",
+  modelLoaded: false,
+  modelName: null,
+  mode: "fast",
+  runtimeState: "not_configured",
+  activeRoute: "local_mock",
+  routeExplanation: "Local Brain is not configured. Cyro will use the local mock fallback.",
+  backendMode: "auto",
+  cpuFallbackActive: false,
+  sidecar: {
+    state: "not_configured",
+    binaryKind: null,
+    path: null,
+    version: null,
+    message: "No sidecar configured.",
+    recoverable: true,
+    userAction: "Configure a local sidecar.",
+    lastCheckedAt: null
+  },
+  localModel: null,
+  modelRegistry: [],
+  benchmark: {
+    status: "not_run",
+    latestResult: null,
+    message: "Benchmark has not run."
+  },
+  generationState: "idle",
+  activeGenerationId: null,
+  lastFinishReason: null,
+  lastError: null,
+  network: "disabled",
+  vault: "not_indexed",
+  memory: "local_only",
+  sync: "disabled",
+  privacy: "offline"
+};
 
 describe("provider shell components", () => {
+  it("renders CyroPresence for the local home state", () => {
+    const html = renderToString(<ProviderShellLayout runtimeStatus={runtimeStatus} onRuntimeRefresh={noopAsync} />);
+
+    expect(html).toContain("cyro-presence");
+    expect(html).toContain("Cyro is ready");
+  });
+
+  it("does not require the old verbose home headline or feature chips", () => {
+    const html = renderToString(<ProviderShellLayout runtimeStatus={runtimeStatus} onRuntimeRefresh={noopAsync} />);
+
+    expect(html).not.toContain("What should Cyro help prepare?");
+    expect(html).not.toContain("One composer routes work");
+    expect(html).not.toContain("Prepare context capsule");
+  });
+
+  it("renders the Cyro-owned animated presence visual", () => {
+    const html = renderToString(<CyroPresence provider="local" status="ready" generationState="idle" />);
+
+    expect(html).toContain("aria-label=\"Cyro Presence\"");
+    expect(html).toContain("cyro-presence-core");
+    expect(html).not.toContain("OpenHuman");
+  });
+
   it("renders ChatGPT blocked state without an iframe panel", () => {
     const html = renderToString(<ProviderBlockedState provider="chatgpt" status="blocked" />);
 
