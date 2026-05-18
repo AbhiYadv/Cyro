@@ -134,6 +134,15 @@ The composer contract is:
 - provider options for Local, ChatGPT, Claude, and Gemini
 - reasoning selector for Fast, Think, and Pro
 - send button at the far right
+- visible Stop control while generation or handoff state is active
+
+Final provider shell UX target:
+- one Cyro-owned chat surface, not a runtime configuration dashboard as the primary experience
+- compact top provider header showing Cyro, selected route, route status, and diagnostics access
+- left drawer for search, new chat, memory, vault, provider sessions, notebooks, and recent chats
+- bottom composer that remains visible for Local, ChatGPT, Claude, and Gemini routes
+- plus/tools tray for attach file, approved vault/memory placeholders, image creation placeholder, explicit provider-answer import placeholder, and settings
+- runtime status is diagnostic and collapsible; it must not dominate the main provider shell
 
 The composer has a route selector for:
 - Local
