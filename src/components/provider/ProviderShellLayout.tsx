@@ -77,12 +77,24 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
         <section className="provider-chat-stage" aria-label="Provider shell stage">
           {shellState.selectedProvider === "local" ? (
             <div className="provider-welcome">
-              <p className="eyebrow">Sovereign memory workspace</p>
-              <h1>What should Cyro help prepare?</h1>
-              <p>
-                One composer routes work to Local, ChatGPT, Claude, or Gemini while Cyro keeps memory, vault, and
-                provider boundaries visible.
-              </p>
+              <div className="provider-welcome-copy">
+                <p className="eyebrow">Sovereign memory workspace</p>
+                <h1>What should Cyro help prepare?</h1>
+                <p>
+                  One composer routes work to Local, ChatGPT, Claude, or Gemini while Cyro keeps memory, vault, and
+                  provider boundaries visible.
+                </p>
+              </div>
+              <div className="local-chat-canvas" aria-label="Local chat workspace preview">
+                <div className="local-chat-turn assistant">
+                  <span>Cyro</span>
+                  <p>Local route is ready for drafting with approved context.</p>
+                </div>
+                <div className="local-chat-turn user">
+                  <span>You</span>
+                  <p>{prompt || "Ask Cyro to prepare context, inspect memory, or draft a response."}</p>
+                </div>
+              </div>
               <div className="prompt-chip-list" aria-label="Prompt starters">
                 {promptChips.map((chip) => (
                   <button type="button" key={chip} onClick={() => setPrompt(chip)}>

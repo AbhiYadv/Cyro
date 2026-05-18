@@ -11,6 +11,8 @@ const recentChats = [
   "Runtime benchmark notes"
 ];
 
+const providerRoutes = ["Local", "ChatGPT", "Claude", "Gemini"];
+
 export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps) {
   return (
     <>
@@ -36,14 +38,25 @@ export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps)
         </button>
 
         <nav className="drawer-nav" aria-label="Cyro sections">
+          <p className="drawer-section-title">Workspace</p>
           <button type="button">Memory</button>
           <button type="button">Vault</button>
           <button type="button">Provider sessions</button>
           <button type="button">Notebooks</button>
         </nav>
 
+        <section className="drawer-provider-routes" aria-label="Provider route placeholders">
+          <p className="drawer-section-title">Providers</p>
+          {providerRoutes.map((route) => (
+            <button type="button" key={route}>
+              <span>{route}</span>
+              <small>{route === "Local" ? "Ready" : "Shell only"}</small>
+            </button>
+          ))}
+        </section>
+
         <section className="drawer-recents" aria-label="Recent chats">
-          <p className="eyebrow">Recent chats</p>
+          <p className="drawer-section-title">Recent chats</p>
           {recentChats.map((chat) => (
             <button type="button" key={chat}>
               {chat}
