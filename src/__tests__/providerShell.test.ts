@@ -17,7 +17,12 @@ describe("provider shell state contract", () => {
     });
 
     expect(next.selectedProvider).toBe("claude");
-    expect(shellComposerPlaceholder(next.selectedProvider)).toBe("Ask Claude");
+    expect(shellComposerPlaceholder(next.selectedProvider)).toBe("Draft for Claude route prototype");
+  });
+
+  it("keeps Local placeholder separate from provider validation wording", () => {
+    expect(shellComposerPlaceholder("local")).toBe("Ask Local");
+    expect(shellComposerPlaceholder("local")).not.toContain("route prototype");
   });
 
   it("uses provider pill state rather than raw route select behavior", () => {
@@ -76,6 +81,10 @@ describe("provider shell state contract", () => {
 
   it("renders ChatGPT as blocked because iframe feasibility failed", () => {
     expect(providerSurfaceStatusForRoute("chatgpt")).toBe("blocked");
+  });
+
+  it("renders Gemini as unvalidated until native container validation exists", () => {
+    expect(providerSurfaceStatusForRoute("gemini")).toBe("unvalidated");
   });
 
   it("shows Send when idle", () => {

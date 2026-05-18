@@ -4,6 +4,7 @@ import { CyroComposer } from "../components/provider/CyroComposer";
 import { CyroLeftDrawer } from "../components/provider/CyroLeftDrawer";
 import { CyroPresence } from "../components/provider/CyroPresence";
 import { ProviderBlockedState } from "../components/provider/ProviderBlockedState";
+import { ProviderHeader } from "../components/provider/ProviderHeader";
 import { ProviderShellLayout } from "../components/provider/ProviderShellLayout";
 import { ProviderToolsMenu } from "../components/provider/ProviderToolsMenu";
 import type { RuntimeStatus } from "../types/runtime";
@@ -76,11 +77,56 @@ describe("provider shell components", () => {
   it("renders ChatGPT blocked state without an iframe panel", () => {
     const html = renderToString(<ProviderBlockedState provider="chatgpt" status="blocked" />);
 
+    expect(html).toContain("Provider shell is not validated yet.");
     expect(html).toContain("Iframe display is blocked");
     expect(html).toContain("blank or blocked iframe");
+    expect(html).toContain("Iframe embedding remains a feasibility result, not the final provider-shell solution.");
     expect(html).toContain("CYRO-PROVIDER-010");
     expect(html).toContain("Tauri-native visible webview/session container");
     expect(html).toContain("Explicit fallback");
+  });
+
+  it("renders Gemini as an unvalidated route prototype with native container follow-up", () => {
+    const html = renderToString(<ProviderBlockedState provider="gemini" status="unvalidated" />);
+
+    expect(html).toContain("Provider shell is not validated yet.");
+    expect(html).toContain(
+      "Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending."
+    );
+    expect(html).toContain(
+      "CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture."
+    );
+    expect(html).not.toContain("Gemini session is ready");
+  });
+
+  it("labels provider header routes as container pending without changing Local", () => {
+    const geminiHtml = renderToString(
+      <ProviderHeader
+        selectedProvider="gemini"
+        reasoningMode="fast"
+        generationState="idle"
+        providerSurfaceStatus="unvalidated"
+        diagnosticsOpen={false}
+        onDrawerToggle={noop}
+        onDiagnosticsToggle={noop}
+      />
+    );
+    const localHtml = renderToString(
+      <ProviderHeader
+        selectedProvider="local"
+        reasoningMode="fast"
+        generationState="idle"
+        providerSurfaceStatus="ready"
+        diagnosticsOpen={false}
+        onDrawerToggle={noop}
+        onDiagnosticsToggle={noop}
+      />
+    );
+
+    expect(geminiHtml).toContain("Gemini route prototype");
+    expect(geminiHtml).toContain("Container pending");
+    expect(localHtml).toContain(">Local<");
+    expect(localHtml).not.toContain("Container pending");
   });
 
   it("renders the tools sheet when opened", () => {
@@ -121,7 +167,7 @@ describe("provider shell components", () => {
     const idleHtml = renderToString(<CyroComposer {...baseProps} generationState="idle" />);
     const streamingHtml = renderToString(<CyroComposer {...baseProps} generationState="streaming" />);
 
-    expect(idleHtml).toContain("Ask Gemini");
+    expect(idleHtml).toContain("Draft for Gemini route prototype");
     expect(idleHtml).toContain("Send");
     expect(streamingHtml).toContain("Stop");
   });
@@ -149,6 +195,7 @@ describe("provider shell components", () => {
     expect(html).toContain("provider-pill active");
     expect(html).toContain("Local");
     expect(html).toContain("ChatGPT");
+    expect(html).toContain("Prototype");
     expect(html).toContain("Claude");
     expect(html).toContain("Gemini");
     expect(html).toContain("reasoning-pill active");

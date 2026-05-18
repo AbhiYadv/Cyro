@@ -142,10 +142,13 @@ Final provider shell UX target:
 - compact top provider header showing Cyro, selected route, route status, and diagnostics access
 - left drawer for search, new chat, memory, vault, provider sessions, notebooks, and recent chats
 - bottom composer that remains visible for Local, ChatGPT, Claude, and Gemini routes
+- provider routes in CYRO-PROVIDER-009 are route prototypes only; ChatGPT, Claude, and Gemini must show blocked, unvalidated, or container-pending status until native provider-session validation passes
 - production-intent provider pills and reasoning pills in the composer, not raw dropdown controls
 - plus/tools tray for attach file, approved vault/memory placeholders, image creation placeholder, explicit provider-answer import placeholder, and settings
 - runtime status is diagnostic and collapsible; it must not dominate the main provider shell
-- iframe feasibility remains blocked for ChatGPT and unvalidated for Claude/Gemini; CYRO-PROVIDER-010 native container research is required before claiming embedded provider hosting works
+- Provider shell is not validated yet. Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending.
+- iframe embedding remains a feasibility result, not the final provider-shell solution; ChatGPT remains blocked/blank and Claude/Gemini remain unvalidated until separately proven
+- CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture before claiming embedded provider hosting works
 
 The composer has a route selector for:
 - Local

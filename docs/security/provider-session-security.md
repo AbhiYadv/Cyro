@@ -26,9 +26,9 @@ This finding does not authorize a bypass. The next safe container path is Tauri-
 
 ## CYRO-PROVIDER-009 Shell UX Security Addendum
 
-CYRO-PROVIDER-009 is a React shell UX prototype only. It may render the Cyro-owned header, drawer, tools tray, route selector, reasoning selector, Send/Stop control, compact diagnostics, and blocked-provider explanation.
+CYRO-PROVIDER-009 is a React shell UX prototype only. It may render the Cyro-owned header, drawer, tools tray, route selector, reasoning selector, Send/Stop control, compact diagnostics, and blocked-provider explanation. Provider shell is not validated yet. Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending.
 
-It does not authorize or implement provider APIs, provider SDKs, scraping, DOM reading, auto-login, credential storage, cookie capture, cookie export, prompt injection, automated prompt sending, provider response capture, provider memory import, or bypass behavior. Provider routes remain visible shell state until a separate Tauri-native provider container research task proves an acceptable session boundary.
+It does not authorize or implement provider APIs, provider SDKs, scraping, DOM reading, auto-login, credential storage, cookie capture, cookie export, prompt injection, automated prompt sending, provider response capture, provider memory import, or bypass behavior. Provider routes remain visible shell state until a separate Tauri-native provider container research task proves an acceptable session boundary. Iframe embedding remains a feasibility result, not the final provider-shell solution. CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture.
 
 ## Future Embedded Session Conditions
 

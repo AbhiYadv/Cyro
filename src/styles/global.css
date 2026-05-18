@@ -1233,8 +1233,19 @@ textarea:disabled {
 }
 
 .provider-pill {
-  min-width: 5.5rem;
-  padding: 0 0.85rem;
+  display: grid;
+  min-width: 5.7rem;
+  align-content: center;
+  gap: 0.06rem;
+  padding: 0.35rem 0.85rem;
+}
+
+.provider-pill small {
+  color: var(--faint);
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .provider-pill.active,
@@ -1242,6 +1253,10 @@ textarea:disabled {
   border-color: rgba(52, 211, 153, 0.42);
   background: rgba(52, 211, 153, 0.13);
   color: #dcfce7;
+}
+
+.provider-pill.active small {
+  color: #b8f7d8;
 }
 
 .composer-send-button {

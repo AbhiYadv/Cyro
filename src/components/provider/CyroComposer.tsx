@@ -1,5 +1,10 @@
 import type { FormEvent } from "react";
-import { generationControlForState, providerDisplayName, shellComposerPlaceholder } from "../../services/providerShell";
+import {
+  generationControlForState,
+  providerDisplayName,
+  providerRouteQualifier,
+  shellComposerPlaceholder
+} from "../../services/providerShell";
 import type { ProviderShellGenerationState, ProviderShellReasoningMode } from "../../services/providerShell";
 import { providerRouteOptions } from "../../services/providerSession";
 import type { ProviderRouteId } from "../../types/provider";
@@ -58,17 +63,24 @@ export function CyroComposer({
             +
           </button>
           <div className="provider-pill-selector" aria-label="Provider route">
-            {providerRouteOptions.map((route) => (
-              <button
-                className={selectedProvider === route.id ? "provider-pill active" : "provider-pill"}
-                key={route.id}
-                type="button"
-                onClick={() => onProviderChange(route.id)}
-                aria-pressed={selectedProvider === route.id}
-              >
-                {providerDisplayName(route.id)}
-              </button>
-            ))}
+            {providerRouteOptions.map((route) => {
+              const qualifier = providerRouteQualifier(route.id);
+              const label = providerDisplayName(route.id);
+
+              return (
+                <button
+                  className={selectedProvider === route.id ? "provider-pill active" : "provider-pill"}
+                  key={route.id}
+                  type="button"
+                  onClick={() => onProviderChange(route.id)}
+                  aria-pressed={selectedProvider === route.id}
+                  aria-label={qualifier ? `${label} ${qualifier}` : label}
+                >
+                  <span>{label}</span>
+                  {qualifier ? <small>{qualifier}</small> : null}
+                </button>
+              );
+            })}
           </div>
           <div className="reasoning-selector" aria-label="Reasoning selector">
             {reasoningOptions.map((option) => (

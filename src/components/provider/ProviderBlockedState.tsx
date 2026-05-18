@@ -1,5 +1,5 @@
 import type { ProviderRouteId } from "../../types/provider";
-import { providerDisplayName } from "../../services/providerShell";
+import { providerDisplayName, providerRouteStatusText } from "../../services/providerShell";
 import type { ProviderSurfaceStatus } from "../../services/providerShell";
 
 type ProviderBlockedStateProps = {
@@ -35,9 +35,10 @@ export function ProviderBlockedState({ provider, status }: ProviderBlockedStateP
     <article className={isBlocked ? "provider-blocked-state blocked" : "provider-blocked-state"} aria-live="polite">
       <div className="provider-blocked-marker">{isBlocked ? "Blocked" : "Unvalidated"}</div>
       <div>
-        <p className="eyebrow">{providerName} route</p>
-        <h2>{isBlocked ? "Iframe display is blocked" : "Provider shell is not validated yet"}</h2>
+        <p className="eyebrow">{providerRouteStatusText(provider)}</p>
+        <h2>Provider shell is not validated yet.</h2>
       </div>
+      <p className="provider-blocked-cause">{isBlocked ? "Iframe display is blocked." : "Container pending."}</p>
       <p>
         {isBlocked
           ? `${providerName} returned a blank or blocked iframe in the feasibility review. Cyro will not pretend this embedded session works.`

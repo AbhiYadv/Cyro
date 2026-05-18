@@ -1,4 +1,9 @@
-import { generationControlForState, providerDisplayName, runtimeDiagnosticsMode } from "../../services/providerShell";
+import {
+  generationControlForState,
+  providerHeaderRouteLabel,
+  providerShellStatusLabel,
+  runtimeDiagnosticsMode
+} from "../../services/providerShell";
 import type {
   ProviderShellGenerationState,
   ProviderShellReasoningMode,
@@ -15,22 +20,6 @@ type ProviderHeaderProps = {
   onDrawerToggle: () => void;
   onDiagnosticsToggle: () => void;
 };
-
-function statusLabel(status: ProviderSurfaceStatus) {
-  if (status === "blocked") {
-    return "Blocked";
-  }
-
-  if (status === "unvalidated") {
-    return "Unvalidated";
-  }
-
-  if (status === "fallback") {
-    return "Fallback";
-  }
-
-  return "Ready";
-}
 
 export function ProviderHeader({
   selectedProvider,
@@ -50,10 +39,10 @@ export function ProviderHeader({
       </button>
       <div className="provider-header-title">
         <span>Cyro</span>
-        <strong>{providerDisplayName(selectedProvider)}</strong>
+        <strong>{providerHeaderRouteLabel(selectedProvider)}</strong>
       </div>
       <div className="provider-header-status" aria-label="Provider shell status">
-        <span>{statusLabel(providerSurfaceStatus)}</span>
+        <span>{providerShellStatusLabel(providerSurfaceStatus)}</span>
         <span>{reasoningMode}</span>
         <span>{control.intent === "stop" ? "Generating" : "Idle"}</span>
       </div>

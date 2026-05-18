@@ -61,7 +61,55 @@ export function providerDisplayName(provider: ProviderRouteId) {
 }
 
 export function shellComposerPlaceholder(provider: ProviderRouteId) {
-  return `Ask ${providerDisplayName(provider)}`;
+  if (provider === "local") {
+    return "Ask Local";
+  }
+
+  return `Draft for ${providerDisplayName(provider)} route prototype`;
+}
+
+export function providerRouteQualifier(provider: ProviderRouteId) {
+  if (provider === "local") {
+    return "";
+  }
+
+  if (provider === "chatgpt") {
+    return "Blocked";
+  }
+
+  return "Prototype";
+}
+
+export function providerHeaderRouteLabel(provider: ProviderRouteId) {
+  if (provider === "local") {
+    return providerDisplayName(provider);
+  }
+
+  return `${providerDisplayName(provider)} route prototype`;
+}
+
+export function providerShellStatusLabel(status: ProviderSurfaceStatus) {
+  if (status === "blocked") {
+    return "Blocked iframe";
+  }
+
+  if (status === "unvalidated") {
+    return "Container pending";
+  }
+
+  if (status === "fallback") {
+    return "Fallback";
+  }
+
+  return "Ready";
+}
+
+export function providerRouteStatusText(provider: ProviderRouteId) {
+  if (provider === "local") {
+    return "Local route";
+  }
+
+  return `${providerDisplayName(provider)} route prototype`;
 }
 
 export function providerSurfaceStatusForRoute(provider: ProviderRouteId): ProviderSurfaceStatus {

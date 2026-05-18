@@ -92,9 +92,9 @@ CYRO-PROVIDER-009 introduces a modern Cyro-owned provider shell around the exist
 - bottom composer with tools button, segmented Local/ChatGPT/Claude/Gemini provider pills, Fast/Think/Pro reasoning pills, and visible Send/Stop control
 - polished blocked state for ChatGPT's blank or blocked iframe feasibility result
 
-This task is UX shell only. The route selector is shell state, not evidence that provider hosting works. It does not create a provider webview container, does not load provider sessions through Tauri-native webviews, does not send prompts to providers, and does not import provider answers.
+This task is UX shell only. The route selector is shell state, not evidence that provider hosting works. ChatGPT, Claude, and Gemini are route prototypes and must be labeled as blocked, unvalidated, or container pending until a native container task proves otherwise. It does not create a provider webview container, does not load provider sessions through Tauri-native webviews, does not send prompts to providers, and does not import provider answers.
 
-The iframe conclusion remains unchanged: iframe embedding is not the final Provider Account Bridge solution. ChatGPT is recorded as blank or blocked in an iframe, and Claude/Gemini remain unvalidated until separately tested. The shell may present selected provider routes and explicit fallback links, but it must not claim provider login or chat works inside Cyro. CYRO-PROVIDER-010 is required before any Tauri-native webview/session-container claim.
+Provider shell is not validated yet. Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending. The iframe conclusion remains unchanged: iframe embedding remains a feasibility result, not the final provider-shell solution. ChatGPT is recorded as blank or blocked in an iframe, and Claude/Gemini remain unvalidated until separately tested. The shell may present selected provider routes and explicit fallback links, but it must not claim provider login or chat works inside Cyro. CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture.
 
 ## Session Isolation Questions
 
