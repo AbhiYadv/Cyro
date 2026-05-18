@@ -128,13 +128,31 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
   if (command === "get_provider_session") {
     const providerId = args?.providerId;
     if (providerId === "chatgpt") {
-      return mockedProviderSession("chatgpt", "ChatGPT", "https://chatgpt.com") as T;
+      return mockedProviderSession(
+        "chatgpt",
+        "ChatGPT",
+        "https://chatgpt.com",
+        "blocked_blank",
+        "Manual review observed a blank or blocked ChatGPT iframe inside the Cyro layout. Iframe embedding is likely unsuitable for ChatGPT final UX."
+      ) as T;
     }
     if (providerId === "claude") {
-      return mockedProviderSession("claude", "Claude", "https://claude.ai") as T;
+      return mockedProviderSession(
+        "claude",
+        "Claude",
+        "https://claude.ai",
+        "not_tested",
+        "Claude iframe behavior has not been manually validated in this review. Cyro must not claim embedded Claude session success."
+      ) as T;
     }
     if (providerId === "gemini") {
-      return mockedProviderSession("gemini", "Gemini", "https://gemini.google.com") as T;
+      return mockedProviderSession(
+        "gemini",
+        "Gemini",
+        "https://gemini.google.com",
+        "not_tested",
+        "Gemini iframe behavior has not been manually validated in this review. Cyro must not claim embedded Gemini session success."
+      ) as T;
     }
     throw new Error("This provider route is not allowlisted.");
   }
@@ -142,12 +160,21 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
   throw new Error(`Unknown Sprint 0 command: ${command}`);
 }
 
-function mockedProviderSession(providerId: ProviderId, displayName: string, origin: string): ProviderSessionDescriptor {
+function mockedProviderSession(
+  providerId: ProviderId,
+  displayName: string,
+  origin: string,
+  feasibilityStatus: ProviderSessionDescriptor["feasibilityStatus"],
+  feasibilityResult: string
+): ProviderSessionDescriptor {
   return {
     providerId,
     displayName,
     origin,
-    providerOwnedLabel: "Provider-owned content. Cyro does not read provider DOM, responses, cookies, tokens, or credentials.",
+    surfaceMechanism: "iframe",
+    feasibilityStatus,
+    feasibilityResult,
+    providerOwnedLabel: "Provider-owned origin. Cyro does not read provider DOM, responses, cookies, tokens, or credentials.",
     fallbackAllowed: true,
     blockedMessage: "If this provider refuses to load inside Cyro, use the explicit fallback link. Do not bypass provider protections."
   };

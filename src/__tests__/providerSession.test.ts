@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  hasBlockedOrBlankProviderResult,
   isAllowlistedProviderOrigin,
   isProviderId,
   loadProviderSurface,
@@ -12,7 +13,22 @@ const chatgptDescriptor: ProviderSessionDescriptor = {
   providerId: "chatgpt",
   displayName: "ChatGPT",
   origin: "https://chatgpt.com",
-  providerOwnedLabel: "Provider-owned content.",
+  surfaceMechanism: "iframe",
+  feasibilityStatus: "blocked_blank",
+  feasibilityResult: "Manual review observed a blank or blocked ChatGPT iframe inside the Cyro layout.",
+  providerOwnedLabel: "Provider-owned origin.",
+  fallbackAllowed: true,
+  blockedMessage: "If this provider refuses to load inside Cyro, use the explicit fallback link."
+};
+
+const claudeDescriptor: ProviderSessionDescriptor = {
+  providerId: "claude",
+  displayName: "Claude",
+  origin: "https://claude.ai",
+  surfaceMechanism: "iframe",
+  feasibilityStatus: "not_tested",
+  feasibilityResult: "Claude iframe behavior has not been manually validated in this review.",
+  providerOwnedLabel: "Provider-owned origin.",
   fallbackAllowed: true,
   blockedMessage: "If this provider refuses to load inside Cyro, use the explicit fallback link."
 };
@@ -42,7 +58,9 @@ describe("providerSession service", () => {
 
     expect(descriptor).toMatchObject({
       providerId: "chatgpt",
-      origin: "https://chatgpt.com"
+      origin: "https://chatgpt.com",
+      surfaceMechanism: "iframe",
+      feasibilityStatus: "blocked_blank"
     });
   });
 
@@ -55,8 +73,11 @@ describe("providerSession service", () => {
     ).rejects.toThrow("Provider origin is not allowlisted.");
   });
 
-  it("labels normal and blocked provider-owned surfaces", () => {
-    expect(providerSurfaceStatusText(chatgptDescriptor, false)).toContain("provider-owned content");
-    expect(providerSurfaceStatusText(chatgptDescriptor, true)).toContain("blocking embedded display");
+  it("does not describe iframe provider surfaces as confirmed loaded sessions", () => {
+    expect(hasBlockedOrBlankProviderResult(chatgptDescriptor)).toBe(true);
+    expect(providerSurfaceStatusText(chatgptDescriptor, false)).toContain("blocked or blank");
+    expect(providerSurfaceStatusText(chatgptDescriptor, true)).toContain("blocked or blank");
+    expect(providerSurfaceStatusText(claudeDescriptor, false)).toContain("not manually validated");
+    expect(providerSurfaceStatusText(claudeDescriptor, false)).not.toContain("loaded");
   });
 });

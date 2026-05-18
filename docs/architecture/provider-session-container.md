@@ -10,7 +10,7 @@ Provider sessions must let the user access their own provider account from a Cyr
 
 CYRO-SPIKE-0004 uses external-browser fallback for ChatGPT, Claude, and Gemini. That fallback is safe and explicit, but it does not provide the final embedded Cyro experience.
 
-CYRO-PROVIDER-008 adds a feasibility shell inside the Cyro workspace. It maps provider ids to hardcoded allowlisted origins through Rust/Tauri, then renders a visible provider-owned surface for ChatGPT, Claude, or Gemini. This is a prototype and does not prove product success until manual login/chat behavior is validated per provider.
+CYRO-PROVIDER-008 adds a feasibility shell inside the Cyro workspace. It maps provider ids to hardcoded allowlisted origins through Rust/Tauri, then renders the selected origin in a React iframe. This is a prototype and does not prove product success until manual login/chat behavior is validated per provider.
 
 External browser fallback is temporary and only used when embedded provider session is unavailable, blocked, or not yet implemented.
 
@@ -42,6 +42,31 @@ The prototype tests whether the following provider origins can appear inside Cyr
 - `chatgpt` -> `https://chatgpt.com`
 - `claude` -> `https://claude.ai`
 - `gemini` -> `https://gemini.google.com`
+
+Implementation mechanism:
+- Current branch uses a React `<iframe>` in `ProviderSessionSurface`.
+- Rust/Tauri only resolves hardcoded provider ids to allowlisted origins through `get_provider_session`.
+- Current branch does not create a Tauri child webview, Tauri `WebviewWindow`, or isolated native session container.
+
+Feasibility review result on 2026-05-18:
+
+| Provider | Origin | Mechanism | Manual result | Feasibility finding |
+|---|---|---|---|---|
+| ChatGPT | `https://chatgpt.com` | React iframe | Observed blank or blocked provider area inside the Cyro layout | Iframe embedding is likely unsuitable for ChatGPT final UX. Do not claim the embedded session works. |
+| Claude | `https://claude.ai` | React iframe | Not manually tested in this review | No success claim. Must be tested in native app before any embedded UX claim. |
+| Gemini | `https://gemini.google.com` | React iframe | Not manually tested in this review | No success claim. Must be tested in native app before any embedded UX claim. |
+
+Iframe conclusion:
+- ChatGPT's blank or blocked result makes iframe embedding unsuitable as the final Provider Account Bridge surface.
+- Claude and Gemini cannot be treated as successful because they were not manually validated in this review.
+- The UI must show a blocked/blank explanation when a provider refuses to render and expose only an explicit user-triggered fallback.
+- No unsafe workaround is permitted. Do not bypass frame, CSP, login, account security, or provider terms protections.
+
+Next implementation path:
+- CYRO-PROVIDER-009 should become Provider Shell Surface v2 using Tauri-native webview/session container research.
+- Research must compare Tauri child webview and `WebviewWindow` behavior for provider origins loaded as top-level native webviews, not iframes.
+- A native webview may avoid iframe-specific frame restrictions, but it is not approved until provider terms, platform behavior, storage partitioning, navigation limits, lifecycle cleanup, and cookie/DOM isolation are proven.
+- The v2 task must keep provider sessions visible, manual, user-controlled, and isolated from React. It must not add provider APIs, scraping, auto-login, DOM reading, prompt automation, response capture, memory import, cookie capture, credential storage, or protection bypasses.
 
 Security boundary:
 - React passes provider id only.

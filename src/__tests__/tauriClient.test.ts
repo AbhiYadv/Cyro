@@ -208,7 +208,10 @@ describe("tauriClient Sprint 0 contract", () => {
         providerId: "chatgpt",
         displayName: "ChatGPT",
         origin: "https://chatgpt.com",
-        providerOwnedLabel: "Provider-owned content.",
+        surfaceMechanism: "iframe",
+        feasibilityStatus: "blocked_blank",
+        feasibilityResult: "Manual review observed a blank or blocked ChatGPT iframe inside the Cyro layout.",
+        providerOwnedLabel: "Provider-owned origin.",
         fallbackAllowed: true,
         blockedMessage: "If this provider refuses to load inside Cyro, use the explicit fallback link."
       } as T;
@@ -216,7 +219,9 @@ describe("tauriClient Sprint 0 contract", () => {
 
     await expect(getProviderSession("chatgpt", invoker)).resolves.toMatchObject({
       providerId: "chatgpt",
-      origin: "https://chatgpt.com"
+      origin: "https://chatgpt.com",
+      surfaceMechanism: "iframe",
+      feasibilityStatus: "blocked_blank"
     });
   });
 

@@ -16,6 +16,10 @@ export function isAllowlistedProviderOrigin(origin: string) {
   return origin === "https://chatgpt.com" || origin === "https://claude.ai" || origin === "https://gemini.google.com";
 }
 
+export function hasBlockedOrBlankProviderResult(descriptor: ProviderSessionDescriptor | null) {
+  return descriptor?.feasibilityStatus === "blocked_blank";
+}
+
 export async function loadProviderSurface(
   providerId: ProviderId,
   getSession: (providerId: ProviderId) => Promise<ProviderSessionDescriptor> = getProviderSession
@@ -34,9 +38,13 @@ export function providerSurfaceStatusText(descriptor: ProviderSessionDescriptor 
     return "Select a provider to test embedded session feasibility.";
   }
 
-  if (blocked) {
-    return `${descriptor.displayName} may be blocking embedded display. Use the explicit fallback only if needed.`;
+  if (blocked || hasBlockedOrBlankProviderResult(descriptor)) {
+    return `${descriptor.displayName} iframe embedding is blocked or blank in this feasibility result. Use the explicit fallback only; do not bypass provider protections.`;
   }
 
-  return `${descriptor.displayName} is loaded as provider-owned content inside the Cyro shell. Manual login and typing remain under user control.`;
+  if (descriptor.feasibilityStatus === "not_tested") {
+    return `${descriptor.displayName} iframe embedding is not manually validated. This is a feasibility surface, not confirmed provider-session UX.`;
+  }
+
+  return `${descriptor.displayName} iframe feasibility is unresolved. Manual login and typing remain user-controlled if the provider surface is visible.`;
 }

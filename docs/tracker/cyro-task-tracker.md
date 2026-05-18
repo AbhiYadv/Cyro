@@ -36,8 +36,8 @@
 | CYRO-PROVIDER-005 | User-Approved Provider Response Import | Backlog | Planned |  |  | Provider responses enter Cyro history/memory only by explicit user approval |
 | CYRO-PROVIDER-006 | Provider-Derived Ghost Tree Memory Proposal | Backlog | Planned |  |  | Cyro proposes structured memory facts from provider responses for user approval |
 | CYRO-PROVIDER-007 | Provider Session Health Panel | Backlog | Planned |  |  | Shows logged-in/available/blocked/error state per provider |
-| CYRO-PROVIDER-008 | Embedded Provider Session Feasibility | task/CYRO-PROVIDER-008-embedded-provider-feasibility | Ready for Review |  | 2026-05-18 | Adds visible provider-owned shell for ChatGPT/Claude/Gemini using Rust allowlisted provider ids/origins; manual provider login/chat findings still pending; no scraping, cookies, automation, response capture, or memory import |
-| CYRO-PROVIDER-009 | In-Cyro Provider Surface Prototype | Backlog | Planned |  |  | Prototypes ChatGPT/Claude/Gemini opening inside Cyro's chat-first UX, not separate browser windows |
+| CYRO-PROVIDER-008 | Embedded Provider Session Feasibility | task/CYRO-PROVIDER-008-embedded-provider-feasibility | Ready for Review |  | 2026-05-18 | Feasibility review: current surface is React iframe, not Tauri child webview/WebviewWindow; ChatGPT observed blank/blocked inside Cyro layout; iframe embedding likely unsuitable for final ChatGPT/Claude/Gemini UX; Claude/Gemini not manually validated; no scraping, cookies, automation, response capture, memory import, APIs, or bypass added |
+| CYRO-PROVIDER-009 | Provider Shell Surface v2 - Tauri-native webview/session container research | Backlog | Planned |  |  | Research Tauri child webview vs WebviewWindow for visible in-Cyro provider origins with isolated sessions, navigation bounds, blocked-state handling, explicit fallback, and no provider APIs/scraping/DOM reading/cookie capture/auto-login/prompt automation/response capture |
 | CYRO-PROVIDER-010 | Unified Composer Provider Selector UX | Backlog | Planned |  |  | Turns the feasibility route selector into the final composer-aligned Local/ChatGPT/Claude/Gemini provider selector without provider automation |
 | CYRO-PROVIDER-010A | Provider Import Button | Backlog | Planned |  |  | Adds explicit user action to import visible provider answers into Cyro history or memory-candidate flow |
 | CYRO-PROVIDER-011 | Always Import Visible Provider Answers Policy | Backlog | Planned |  |  | Defines that provider answers enter Cyro only through visible, user-triggered import; no hidden response capture |
@@ -85,7 +85,7 @@ Cyro remains the control plane for memory, vault, privacy filtering, provider ro
 
 Provider-owned content must remain visible and user-controlled inside an isolated Cyro provider surface.
 
-CYRO-PROVIDER-008 adds the first embedded feasibility shell. It proves allowlisted provider routing and visible blocked/fallback handling in Cyro, but it does not claim manual provider login or chat success until ChatGPT, Claude, and Gemini are each validated in the native app.
+CYRO-PROVIDER-008 adds the first embedded feasibility shell. It proves allowlisted provider routing and visible blocked/fallback handling in Cyro, but the implementation surface is a React iframe. The 2026-05-18 review recorded ChatGPT as blank/blocked inside the Cyro layout, making iframe embedding likely unsuitable for final provider shell UX. Claude and Gemini were not manually validated in this review. The next task is CYRO-PROVIDER-009 Provider Shell Surface v2 using Tauri-native webview/session container research.
 
 ## Local Model Evaluation Direction
 
