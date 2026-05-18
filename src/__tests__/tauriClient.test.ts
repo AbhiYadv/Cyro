@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatRuntimeError,
   cancelGeneration,
+  getProviderSession,
   getRuntimeStatus,
   isPromptValid,
   runRuntimeBenchmark,
@@ -197,6 +198,31 @@ describe("tauriClient Sprint 0 contract", () => {
     };
 
     await expect(setRuntimeBackendMode("cpu", invoker)).resolves.toBe("cpu");
+  });
+
+  it("invokes the provider session command with provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("get_provider_session");
+      expect(args).toEqual({ providerId: "chatgpt" });
+      return {
+        providerId: "chatgpt",
+        displayName: "ChatGPT",
+        origin: "https://chatgpt.com",
+        surfaceMechanism: "iframe",
+        feasibilityStatus: "blocked_blank",
+        feasibilityResult: "Manual review observed a blank or blocked ChatGPT iframe inside the Cyro layout.",
+        providerOwnedLabel: "Provider-owned origin.",
+        fallbackAllowed: true,
+        blockedMessage: "If this provider refuses to load inside Cyro, use the explicit fallback link."
+      } as T;
+    };
+
+    await expect(getProviderSession("chatgpt", invoker)).resolves.toMatchObject({
+      providerId: "chatgpt",
+      origin: "https://chatgpt.com",
+      surfaceMechanism: "iframe",
+      feasibilityStatus: "blocked_blank"
+    });
   });
 
   it("sends a mocked local prompt response with the selected mode", async () => {

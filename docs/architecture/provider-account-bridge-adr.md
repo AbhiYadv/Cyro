@@ -12,7 +12,10 @@ Final Provider Account Bridge UX target: ChatGPT, Claude, Gemini, and future pro
 
 Current implementation state:
 - Local route sends to the Cyro local or mocked runtime.
-- ChatGPT, Claude, and Gemini routes may use a safe external-browser fallback only as temporary spike behavior or blocked-provider fallback.
+- CYRO-PROVIDER-008 adds a visible provider feasibility shell for ChatGPT, Claude, and Gemini using Rust/Tauri allowlisted provider ids and origins plus a React iframe surface.
+- The 2026-05-18 feasibility review observed ChatGPT as blank or blocked in the iframe. Iframe embedding is likely unsuitable for ChatGPT/Claude/Gemini final UX unless a provider is separately proven otherwise.
+- CYRO-PROVIDER-008 does not use a Tauri child webview, `WebviewWindow`, or native session container.
+- ChatGPT, Claude, and Gemini routes may still use a safe external-browser fallback only as temporary spike behavior or blocked-provider fallback.
 - Cyro does not send prompts automatically to providers.
 - Cyro shows external-provider handoff status only.
 
@@ -32,6 +35,8 @@ The final product target is embedded in-Cyro provider sessions. The user should 
 External browser fallback is temporary and only used when embedded provider session is unavailable, blocked, or not yet implemented.
 
 Embedded provider session feasibility is a required product milestone before Provider Account Bridge can be considered product-complete. The milestone must prove that provider-owned content can remain visible and user-controlled inside an isolated Cyro provider surface without exposing cookies, credentials, DOM, or response content to Cyro code.
+
+CYRO-PROVIDER-008 records feasibility status only. It does not claim that provider login or chat works until the user manually validates ChatGPT, Claude, and Gemini inside the native app. ChatGPT's observed blank/blocked iframe means the iframe route is not acceptable as final provider shell UX. If a provider blocks embedding, Cyro must show a blocked state and expose only an explicit user-triggered external fallback.
 
 Cyro remains the control plane for memory, vault, privacy filtering, provider route selection, and context capsule preparation.
 

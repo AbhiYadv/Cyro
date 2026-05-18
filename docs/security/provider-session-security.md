@@ -18,6 +18,12 @@ Current approved behavior:
 - No provider response is imported automatically.
 - No provider credentials, cookies, tokens, or sessions are handled by Cyro.
 
+## CYRO-PROVIDER-008 Feasibility Review Addendum
+
+The 2026-05-18 feasibility review found that the current embedded shell is iframe-based. ChatGPT was observed as blank or blocked inside the Cyro layout, so iframe embedding is likely unsuitable for final provider shell UX. Claude and Gemini were not manually validated in this review, so no embedded-session success is claimed for them.
+
+This finding does not authorize a bypass. The next safe path is Provider Shell Surface v2 research using Tauri-native child webview or `WebviewWindow` session containers, with explicit proof that React cannot read provider cookies, tokens, DOM, or response content.
+
 ## Future Embedded Session Conditions
 
 Embedded provider sessions may be considered only if all of these are satisfied:
