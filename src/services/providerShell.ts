@@ -65,7 +65,7 @@ export function shellComposerPlaceholder(provider: ProviderRouteId) {
     return "Ask Local";
   }
 
-  return "Prompt bridge pending";
+  return "Prompt bridge coming later";
 }
 
 export function providerRouteQualifier(_provider: ProviderRouteId) {
@@ -84,11 +84,11 @@ export function shouldAutoOpenProvider(provider: ProviderRouteId, containerState
 
 export function providerShellStatusLabel(status: ProviderSurfaceStatus) {
   if (status === "blocked") {
-    return "Blocked iframe";
+    return "Blocked";
   }
 
   if (status === "unvalidated") {
-    return "Container pending";
+    return "Pending";
   }
 
   if (status === "fallback") {
@@ -100,10 +100,10 @@ export function providerShellStatusLabel(status: ProviderSurfaceStatus) {
 
 export function providerRouteStatusText(provider: ProviderRouteId) {
   if (provider === "local") {
-    return "Local route";
+    return "Local";
   }
 
-  return `${providerDisplayName(provider)} route prototype`;
+  return providerDisplayName(provider);
 }
 
 export function providerSurfaceStatusForRoute(provider: ProviderRouteId): ProviderSurfaceStatus {

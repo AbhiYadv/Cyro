@@ -235,13 +235,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
           <section className="provider-diagnostics-panel" aria-label="Runtime diagnostics">
             <RuntimePanel status={runtimeStatus} onStatusRefresh={onRuntimeRefresh} />
           </section>
-        ) : (
-          <section className="provider-diagnostics-compact" aria-label="Compact runtime diagnostics">
-            <span>Runtime: {runtimeStatus.runtimeState}</span>
-            <span>Route: {runtimeStatus.activeRoute}</span>
-            <span>Privacy: {runtimeStatus.privacy}</span>
-          </section>
-        )}
+        ) : null}
 
         <CyroComposer
           selectedProvider={shellState.selectedProvider}

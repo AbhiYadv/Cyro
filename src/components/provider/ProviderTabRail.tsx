@@ -50,7 +50,7 @@ export function ProviderTabRail({ selectedProvider, nativeContainerStatus, onPro
             onClick={() => onProviderChange(route)}
           >
             <span className="provider-tab-name">{providerDisplayName(route)}</span>
-            <span className={`provider-tab-chip ${variant}`}>{label}</span>
+            {isActive ? <span className={`provider-tab-chip ${variant}`}>{label}</span> : null}
           </button>
         );
       })}

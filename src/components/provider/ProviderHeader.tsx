@@ -1,7 +1,6 @@
 import {
   generationControlForState,
   providerHeaderRouteLabel,
-  providerShellStatusLabel,
   runtimeDiagnosticsMode
 } from "../../services/providerShell";
 import type {
@@ -30,6 +29,7 @@ export function ProviderHeader({
   onDiagnosticsToggle
 }: ProviderHeaderProps) {
   const control = generationControlForState(generationState);
+  const statusLabel = providerHeaderStatusLabel(providerSurfaceStatus, providerContainerState);
 
   return (
     <header className="provider-header">
@@ -40,12 +40,14 @@ export function ProviderHeader({
         <span>Cyro</span>
         <strong>{providerHeaderRouteLabel(selectedProvider)}</strong>
       </div>
-      <div className="provider-header-status" aria-label="Provider shell status">
-        <span>{providerHeaderStatusLabel(providerSurfaceStatus, providerContainerState)}</span>
-        {control.intent === "stop" ? <span>Generating</span> : null}
-      </div>
+      {statusLabel || control.intent === "stop" ? (
+        <div className="provider-header-status" aria-label="Provider shell status">
+          {statusLabel ? <span>{statusLabel}</span> : null}
+          {control.intent === "stop" ? <span>Generating</span> : null}
+        </div>
+      ) : null}
       <button className="diagnostics-toggle" type="button" onClick={onDiagnosticsToggle}>
-        Diagnostics: {runtimeDiagnosticsMode(diagnosticsOpen)}
+        Diagnostics {runtimeDiagnosticsMode(diagnosticsOpen)}
       </button>
     </header>
   );
@@ -71,5 +73,9 @@ function providerHeaderStatusLabel(
     return "Fallback";
   }
 
-  return providerShellStatusLabel(providerSurfaceStatus);
+  if (providerSurfaceStatus === "fallback") {
+    return "Fallback";
+  }
+
+  return null;
 }

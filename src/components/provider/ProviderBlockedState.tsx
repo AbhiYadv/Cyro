@@ -1,5 +1,5 @@
 import type { ProviderContainerState, ProviderRouteId } from "../../types/provider";
-import { providerDisplayName, providerRouteStatusText } from "../../services/providerShell";
+import { providerDisplayName } from "../../services/providerShell";
 import type { ProviderSurfaceStatus } from "../../services/providerShell";
 
 type ProviderBlockedStateProps = {
@@ -63,25 +63,26 @@ export function ProviderBlockedState({
     <article className={isBlocked ? "provider-blocked-state blocked" : "provider-blocked-state"} aria-live="polite">
       <div className="provider-blocked-marker">{nativeStatusLabel ?? (isBlocked ? "Blocked" : "Unvalidated")}</div>
       <div>
-        <p className="eyebrow">{providerRouteStatusText(provider)}</p>
-        <h2>Native provider session pending.</h2>
+        <p className="eyebrow">{providerName}</p>
+        <h2>Open {providerName} in Cyro.</h2>
       </div>
-      <p className="provider-blocked-cause">{isBlocked ? "Iframe embedding is blocked." : "Native session validation pending."}</p>
       <p>
-        {isBlocked
-          ? `${providerName} returned a blank or blocked iframe in the feasibility review. A native provider container is being validated for this route.`
-          : `${providerName} is available as a route in the shell, but native provider session validation is next.`}
+        Provider-owned content opens inside Cyro. Cyro cannot read DOM, cookies, credentials, prompts, or responses.
       </p>
-      <p className="provider-native-boundary">No DOM, cookie, credential, prompt, or response capture.</p>
+      <p className="provider-blocked-cause">
+        {isBlocked
+          ? "Iframe embedding is blocked, so Cyro uses a visible native provider container for this route."
+          : "Native provider session validation is pending for this route."}
+      </p>
       <div className="provider-container-actions">
-        {containerState === "native_failed" && onOpenInLayoutContainer ? (
+        {onOpenInLayoutContainer ? (
           <button className="provider-native-button" type="button" onClick={onOpenInLayoutContainer}>
-            Retry native session
+            {containerState === "native_failed" ? "Retry in Cyro" : "Open in Cyro"}
           </button>
         ) : null}
         {onOpenSeparateWindowFallback ? (
           <button className="provider-native-button secondary" type="button" onClick={onOpenSeparateWindowFallback}>
-            Separate window fallback
+            Open separate window
           </button>
         ) : null}
         <a className="provider-fallback-link" href={fallbackOrigins[provider]} target="_blank" rel="noreferrer">

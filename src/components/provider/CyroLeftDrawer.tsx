@@ -42,7 +42,7 @@ export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps)
           <button type="button">Memory</button>
           <button type="button">Vault</button>
           <button type="button">Provider sessions</button>
-          <button type="button">Notebooks</button>
+          <button type="button">Settings</button>
         </nav>
 
         <section className="drawer-provider-routes" aria-label="Provider route placeholders">

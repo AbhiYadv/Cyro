@@ -84,19 +84,23 @@ export function CyroComposer({
               );
             })}
           </div>
-          <div className="reasoning-selector" aria-label="Reasoning selector">
-            {reasoningOptions.map((option) => (
-              <button
-                className={reasoningMode === option.id ? "reasoning-pill active" : "reasoning-pill"}
-                key={option.id}
-                type="button"
-                onClick={() => onReasoningChange(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          {control.intent === "send" ? (
+          {isLocalRoute ? (
+            <div className="reasoning-selector" aria-label="Reasoning selector">
+              {reasoningOptions.map((option) => (
+                <button
+                  className={reasoningMode === option.id ? "reasoning-pill active" : "reasoning-pill"}
+                  key={option.id}
+                  type="button"
+                  onClick={() => onReasoningChange(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {!isLocalRoute ? (
+            <span className="composer-bridge-copy">Prompt bridge coming later — use the provider box inside the session.</span>
+          ) : control.intent === "send" ? (
             <button className="composer-send-button" type="submit">
               {control.label}
             </button>
