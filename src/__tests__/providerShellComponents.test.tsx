@@ -69,6 +69,7 @@ describe("provider shell components", () => {
     const html = renderToString(<ProviderShellLayout runtimeStatus={runtimeStatus} onRuntimeRefresh={noopAsync} />);
 
     expect(html).toContain("provider-shell-main local-mode");
+    expect(html).toContain("provider-home-presence star-only-home");
     expect(html).toContain("cyro-star-presence");
     expect(html).toContain("cyro-composer-shell");
     expect(html).not.toContain("<h1>Cyro</h1>");
@@ -617,6 +618,7 @@ describe("provider shell components", () => {
 
     expect(html).toContain("provider-native-canvas");
     expect(html).toContain("Protected provider session");
+    expect(html).toContain("provider-native-canvas-label compact");
     expect(html).not.toContain("aria-label=\"Open in separate window\"");
     expect(html).not.toContain("Provider-owned session — Cyro cannot read this content.");
     expect(html).not.toContain(">Open in separate window<");

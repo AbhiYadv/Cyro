@@ -506,7 +506,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
 
         <section className={stageClassName} aria-label="Provider shell stage">
           {isLocalRoute ? (
-            <div className="provider-home-presence">
+            <div className="provider-home-presence star-only-home">
               <CyroPresence
                 provider={shellState.selectedProvider}
                 status={shellState.providerSurfaceStatus}

@@ -63,7 +63,7 @@ export function ProviderNativeCanvas({
             <span className="provider-browser-icon provider-browser-icon-home" aria-hidden="true" />
           </button>
         </div>
-        <div className="provider-native-canvas-label provider-native-canvas-lock">
+        <div className="provider-native-canvas-label compact provider-native-canvas-lock">
           <span className="provider-native-lock-icon" aria-hidden="true" />
           <strong>Protected provider session</strong>
         </div>

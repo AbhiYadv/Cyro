@@ -45,7 +45,8 @@
   color: var(--text);
 }
 
-:root[data-cyro-theme="light"] {
+:root[data-cyro-theme="light"],
+.provider-shell-layout[data-cyro-theme="light"] {
   color-scheme: light;
   --shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
   --shell-body-background:
@@ -873,6 +874,10 @@ textarea:disabled {
   --provider-shell-pad: clamp(1rem, 4vw, 2.5rem);
 }
 
+.provider-shell-layout[data-cyro-theme="light"] {
+  background: var(--provider-app-background);
+}
+
 .provider-shell-main {
   position: relative;
   display: grid;
@@ -887,9 +892,24 @@ textarea:disabled {
 }
 
 .provider-shell-main.local-mode {
+  --provider-shell-max: 100vw;
+  isolation: isolate;
+  width: 100%;
   grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
   padding-bottom: 9.5rem;
+}
+
+.provider-shell-main.local-mode::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 43%, rgba(250, 204, 21, 0.15), transparent 18rem),
+    radial-gradient(circle at 48% 55%, rgba(94, 234, 212, 0.09), transparent 29rem),
+    radial-gradient(circle at 24% 28%, rgba(52, 211, 153, 0.055), transparent 24rem);
+  content: "";
 }
 
 .provider-shell-main.provider-mode {
@@ -1029,9 +1049,12 @@ textarea:disabled {
 }
 
 .provider-shell-main.provider-mode .provider-header {
-  min-height: 2.65rem;
-  padding-top: 0.22rem;
-  padding-bottom: 0.22rem;
+  min-height: 2.35rem;
+  border-bottom-color: rgba(255, 255, 255, 0.045);
+  background: rgba(3, 4, 5, 0.5);
+  padding-top: 0.12rem;
+  padding-bottom: 0.12rem;
+  backdrop-filter: blur(14px);
 }
 
 .provider-header-actions {
@@ -1073,6 +1096,34 @@ textarea:disabled {
   scrollbar-width: none;
 }
 
+.provider-shell-main.local-mode .provider-header {
+  border-bottom-color: transparent;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.provider-shell-main.local-mode .provider-tab-rail {
+  min-height: 1.75rem;
+  border-bottom-color: transparent;
+  background: transparent;
+}
+
+.provider-shell-main.local-mode .provider-tab {
+  min-height: 1.55rem;
+  padding: 0.18rem 0.46rem;
+  opacity: 0.74;
+}
+
+.provider-shell-main.local-mode .provider-tab-rail,
+.provider-shell-main.local-mode .provider-chat-stage {
+  position: relative;
+  z-index: 1;
+}
+
+.provider-shell-main.local-mode .provider-tab.active {
+  opacity: 1;
+}
+
 .provider-tab-rail::-webkit-scrollbar {
   display: none;
 }
@@ -1095,10 +1146,10 @@ textarea:disabled {
 }
 
 .provider-shell-main.provider-mode .provider-tab {
-  min-height: 1.75rem;
+  min-height: 1.55rem;
   border-color: transparent;
   background: transparent;
-  padding: 0.24rem 0.56rem;
+  padding: 0.18rem 0.5rem;
 }
 
 .provider-tab:hover {
@@ -1204,7 +1255,7 @@ textarea:disabled {
 
 .provider-shell-main.local-mode .provider-chat-stage {
   align-content: center;
-  padding: clamp(2rem, 8vh, 5rem) var(--provider-shell-pad) clamp(10rem, 19vh, 15rem);
+  padding: clamp(1.5rem, 7vh, 4.5rem) var(--provider-shell-pad) clamp(12rem, 22vh, 18rem);
 }
 
 .provider-shell-main.provider-mode .provider-chat-stage {
@@ -1236,6 +1287,11 @@ textarea:disabled {
   text-align: center;
 }
 
+.provider-home-presence.star-only-home {
+  max-width: 42rem;
+  transform: translateY(clamp(-1.25rem, -3vh, -0.35rem));
+}
+
 .provider-home-state p,
 .provider-blocked-state p {
   max-width: 50rem;
@@ -1247,7 +1303,7 @@ textarea:disabled {
 .cyro-star-presence {
   position: relative;
   display: grid;
-  width: clamp(9.2rem, 21vw, 13.2rem);
+  width: clamp(12.5rem, 24vw, 18rem);
   aspect-ratio: 1;
   place-items: center;
   filter: drop-shadow(0 24px 60px rgba(250, 204, 21, 0.17));
@@ -1408,13 +1464,14 @@ textarea:disabled {
 
 .provider-browser-toolbar {
   display: grid;
-  min-height: 2.15rem;
+  min-height: 1.64rem;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.26rem 0.42rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
-  background: rgba(5, 6, 7, 0.74);
+  gap: 0.28rem;
+  padding: 0.12rem 0.28rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.035);
+  background: rgba(3, 4, 5, 0.58);
+  backdrop-filter: blur(12px);
 }
 
 .provider-browser-controls {
@@ -1426,21 +1483,21 @@ textarea:disabled {
 .provider-browser-control {
   position: relative;
   display: grid;
-  width: 1.76rem;
-  min-width: 1.76rem;
-  height: 1.76rem;
+  width: 1.42rem;
+  min-width: 1.42rem;
+  height: 1.42rem;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 0.48rem;
-  background: rgba(255, 255, 255, 0.026);
-  color: rgba(226, 232, 240, 0.82);
+  border-radius: 0.38rem;
+  background: rgba(255, 255, 255, 0.018);
+  color: rgba(226, 232, 240, 0.68);
   cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .provider-browser-control:hover:not(:disabled) {
-  border-color: rgba(94, 234, 212, 0.18);
-  background: rgba(94, 234, 212, 0.065);
+  border-color: rgba(94, 234, 212, 0.16);
+  background: rgba(94, 234, 212, 0.055);
   color: #e6fffb;
 }
 
@@ -1456,8 +1513,8 @@ textarea:disabled {
 .provider-browser-icon {
   position: relative;
   display: block;
-  width: 0.92rem;
-  height: 0.92rem;
+  width: 0.74rem;
+  height: 0.74rem;
 }
 
 .provider-browser-icon-back::before,
@@ -1556,20 +1613,32 @@ textarea:disabled {
   z-index: 3;
   display: flex;
   max-width: calc(100% - 1rem);
-  min-height: 1.35rem;
+  min-height: 1.08rem;
   align-items: center;
-  gap: 0.26rem;
+  gap: 0.2rem;
   border: 1px solid rgba(148, 163, 184, 0.11);
   border-radius: 999px;
-  padding: 0.18rem 0.42rem;
-  background: rgba(5, 9, 10, 0.46);
+  padding: 0.08rem 0.3rem;
+  background: rgba(5, 9, 10, 0.32);
   color: var(--text);
   backdrop-filter: blur(10px);
 }
 
 .provider-native-canvas-label.provider-native-canvas-lock {
-  border-color: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.085);
+  background: rgba(7, 13, 14, 0.34);
+}
+
+.provider-native-canvas-label.compact {
+  opacity: 0.42;
+  transition: opacity 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.provider-browser-toolbar:hover .provider-native-canvas-label.compact,
+.provider-browser-toolbar:focus-within .provider-native-canvas-label.compact {
+  border-color: rgba(148, 163, 184, 0.16);
   background: rgba(7, 13, 14, 0.48);
+  opacity: 0.74;
 }
 
 .provider-native-canvas-label span {
@@ -1579,19 +1648,19 @@ textarea:disabled {
 
 .provider-native-lock-icon {
   position: relative;
-  width: 0.58rem;
-  height: 0.5rem;
-  border: 1.4px solid rgba(184, 247, 216, 0.82);
-  border-radius: 0.12rem;
+  width: 0.46rem;
+  height: 0.4rem;
+  border: 1.2px solid rgba(184, 247, 216, 0.7);
+  border-radius: 0.1rem;
 }
 
 .provider-native-lock-icon::before {
   position: absolute;
-  right: 0.06rem;
-  bottom: 0.38rem;
-  left: 0.06rem;
-  height: 0.38rem;
-  border: 1.4px solid rgba(184, 247, 216, 0.82);
+  right: 0.05rem;
+  bottom: 0.3rem;
+  left: 0.05rem;
+  height: 0.3rem;
+  border: 1.2px solid rgba(184, 247, 216, 0.7);
   border-bottom: 0;
   border-radius: 999px 999px 0 0;
   content: "";
@@ -1599,9 +1668,9 @@ textarea:disabled {
 
 .provider-native-canvas-label strong {
   overflow: hidden;
-  color: rgba(229, 249, 243, 0.82);
-  font-size: 0.66rem;
-  font-weight: 520;
+  color: rgba(229, 249, 243, 0.68);
+  font-size: 0.58rem;
+  font-weight: 480;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1877,6 +1946,11 @@ textarea:disabled {
   transform: translateX(-50%);
 }
 
+.provider-shell-main.local-mode .cyro-composer-shell {
+  bottom: clamp(3rem, 16vh, 11rem);
+  width: min(calc(100vw - 2rem), 58rem);
+}
+
 .cyro-composer {
   display: grid;
   gap: 0.8rem;
@@ -1888,6 +1962,13 @@ textarea:disabled {
   background: var(--composer-background);
   box-shadow: 0 22px 80px rgba(0, 0, 0, 0.48);
   backdrop-filter: blur(24px);
+}
+
+.provider-shell-main.local-mode .cyro-composer {
+  width: min(100% - 2rem, 52rem);
+  border-color: var(--control-border);
+  padding: 0.85rem;
+  box-shadow: 0 18px 64px rgba(0, 0, 0, 0.38);
 }
 
 .cyro-composer textarea {
@@ -2092,12 +2173,13 @@ textarea:disabled {
   padding: 1.15rem;
   border-right: 1px solid var(--control-border);
   background: var(--drawer-background);
-  box-shadow: 24px 0 80px rgba(0, 0, 0, 0.48);
+  box-shadow: none;
   transition: transform 160ms ease;
 }
 
 .cyro-left-drawer.open {
   transform: translateX(0);
+  box-shadow: 24px 0 80px rgba(0, 0, 0, 0.48);
 }
 
 .drawer-top-row,
