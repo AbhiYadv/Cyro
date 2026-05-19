@@ -7,6 +7,7 @@ export type ProviderContainerState =
   | "iframe_blocked"
   | "native_opening"
   | "native_visible"
+  | "native_hidden"
   | "native_failed"
   | "separate_window_fallback";
 export type ProviderNativeContainerStatus = ProviderContainerState;

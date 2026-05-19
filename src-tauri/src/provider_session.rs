@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::{
-    webview::Color, LogicalPosition, LogicalSize, Manager, Rect, Url, WebviewBuilder, WebviewUrl,
+    webview::{Color, PageLoadEvent},
+    LogicalPosition, LogicalSize, Manager, Rect, Url, WebviewBuilder, WebviewUrl,
     WebviewWindowBuilder,
 };
 
@@ -41,6 +42,12 @@ pub struct ProviderViewportBounds {
     pub height: f64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ProviderWebviewSessionPolicy {
+    pub incognito: bool,
+    pub data_store_identifier: [u8; 16],
+}
+
 const PROVIDER_VIEWPORT_MIN_WIDTH: f64 = 320.0;
 const PROVIDER_VIEWPORT_MIN_HEIGHT: f64 = 280.0;
 const PROVIDER_VIEWPORT_MAX_EDGE: f64 = 12_000.0;
@@ -63,8 +70,6 @@ pub async fn open_in_layout_provider_container(
     let target = resolve_in_layout_provider_container(&provider_id)?;
     let bounds = provider_in_layout_bounds_from_viewport(&window, &provider_id, viewport_bounds)?;
 
-    close_other_in_layout_provider_webviews(&app, target.window_label)?;
-
     if let Some(webview) = app.get_webview(target.window_label) {
         webview.set_bounds(bounds).map_err(|error| {
             RuntimeError::recoverable(
@@ -74,11 +79,19 @@ pub async fn open_in_layout_provider_container(
                 Some(error.to_string()),
             )
         })?;
+        webview.show().map_err(|error| {
+            RuntimeError::recoverable(
+                "provider_in_layout_show_failed",
+                "Cyro could not show the existing in-layout provider webview.",
+                "Close and reopen Cyro before continuing provider container validation.",
+                Some(error.to_string()),
+            )
+        })?;
 
         return Ok(target.with_status(
             "native_visible",
             format!(
-                "{} in-layout native provider webview is attached to the main Cyro window. This validates placement only, not login, chat, or session persistence.",
+                "{} in-layout native provider webview is attached to the main Cyro window. Provider-owned session storage remains inside the native webview.",
                 target.display_name
             ),
         ));
@@ -92,21 +105,32 @@ pub async fn open_in_layout_provider_container(
             Some(error.to_string()),
         )
     })?;
-    let allowed_host = provider_url.host_str().unwrap_or_default().to_string();
+    let session_policy = provider_webview_session_policy(&provider_id)?;
+    let navigation_provider_id = target.provider_id.clone();
+    let popup_provider_id = target.provider_id.clone();
 
-    let webview_builder = WebviewBuilder::new(
-        target.window_label,
-        WebviewUrl::External(provider_url),
-    )
-    .background_color(PROVIDER_WEBVIEW_DARK_BACKGROUND)
-    .incognito(true)
-    .on_navigation(move |url| {
-        url.scheme() == "https" && url.host_str() == Some(allowed_host.as_str())
-    })
-    .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny);
+    let webview_builder =
+        WebviewBuilder::new(target.window_label, WebviewUrl::External(provider_url))
+            .background_color(PROVIDER_WEBVIEW_DARK_BACKGROUND)
+            .incognito(session_policy.incognito)
+            .data_store_identifier(session_policy.data_store_identifier)
+            .on_navigation(move |url| is_provider_navigation_allowed(&navigation_provider_id, url))
+            .on_page_load(|webview, payload| {
+                if payload.event() == PageLoadEvent::Finished {
+                    let _ = webview.show();
+                }
+            })
+            .on_new_window(move |url, _| {
+                if is_provider_navigation_allowed(&popup_provider_id, &url) {
+                    tauri::webview::NewWindowResponse::Allow
+                } else {
+                    tauri::webview::NewWindowResponse::Deny
+                }
+            });
 
+    let hidden_bounds = hidden_provider_child_bounds();
     window
-        .add_child(webview_builder, bounds.position, bounds.size)
+        .add_child(webview_builder, hidden_bounds.position, hidden_bounds.size)
         .map_err(|error| {
             RuntimeError::recoverable(
                 "provider_in_layout_webview_failed",
@@ -114,12 +138,38 @@ pub async fn open_in_layout_provider_container(
                 "Use the explicit separate-window fallback and keep CYRO-PROVIDER-011 marked as unresolved for final UX.",
                 Some(error.to_string()),
             )
+        })?
+        .hide()
+        .map_err(|error| {
+            RuntimeError::recoverable(
+                "provider_in_layout_hide_failed",
+                "Cyro could not hide the new in-layout provider webview during initial load.",
+                "Use the explicit separate-window fallback and keep provider-session validation pending.",
+                Some(error.to_string()),
+            )
         })?;
+
+    let Some(webview) = app.get_webview(target.window_label) else {
+        return Err(RuntimeError::recoverable(
+            "provider_in_layout_webview_missing",
+            "Cyro attached the provider webview but could not retrieve it for positioning.",
+            "Use the explicit separate-window fallback and keep provider-session validation pending.",
+            None,
+        ));
+    };
+    webview.set_bounds(bounds).map_err(|error| {
+        RuntimeError::recoverable(
+            "provider_in_layout_resize_failed",
+            "Cyro could not position the hidden provider webview before first paint.",
+            "Use the explicit separate-window fallback and keep provider-session validation pending.",
+            Some(error.to_string()),
+        )
+    })?;
 
     Ok(target.with_status(
         "native_visible",
         format!(
-            "{} in-layout native provider webview opened inside the main Cyro window. This validates placement only, not login, chat, or session persistence.",
+            "{} in-layout native provider webview opened inside the main Cyro window with provider-owned persistent session storage.",
             target.display_name
         ),
     ))
@@ -153,11 +203,46 @@ pub async fn resize_in_layout_provider_container(
             Some(error.to_string()),
         )
     })?;
+    webview.show().map_err(|error| {
+        RuntimeError::recoverable(
+            "provider_in_layout_show_failed",
+            "Cyro could not show the in-layout provider webview.",
+            "Close and reopen the provider route before continuing provider container validation.",
+            Some(error.to_string()),
+        )
+    })?;
 
     Ok(target.with_status(
         "native_visible",
         format!(
             "{} in-layout native provider webview bounds updated from the Cyro provider viewport.",
+            target.display_name
+        ),
+    ))
+}
+
+#[tauri::command]
+pub async fn hide_in_layout_provider_container(
+    app: tauri::AppHandle,
+    provider_id: String,
+) -> Result<ProviderNativeContainerResult, RuntimeError> {
+    let target = resolve_in_layout_provider_container(&provider_id)?;
+
+    if let Some(webview) = app.get_webview(target.window_label) {
+        webview.hide().map_err(|error| {
+            RuntimeError::recoverable(
+                "provider_in_layout_hide_failed",
+                "Cyro could not hide the inactive in-layout provider webview.",
+                "Close and reopen Cyro before continuing provider container validation.",
+                Some(error.to_string()),
+            )
+        })?;
+    }
+
+    Ok(target.with_status(
+        "native_hidden",
+        format!(
+            "{} in-layout native provider webview hidden without closing its provider-owned session.",
             target.display_name
         ),
     ))
@@ -232,6 +317,9 @@ pub async fn open_native_provider_container(
             Some(error.to_string()),
         )
     })?;
+    let session_policy = provider_webview_session_policy(&provider_id)?;
+    let navigation_provider_id = target.provider_id.clone();
+    let popup_provider_id = target.provider_id.clone();
 
     WebviewWindowBuilder::new(
         &app,
@@ -244,8 +332,16 @@ pub async fn open_native_provider_container(
     .resizable(true)
     .visible(true)
     .focused(true)
-    .incognito(true)
-    .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
+    .incognito(session_policy.incognito)
+    .data_store_identifier(session_policy.data_store_identifier)
+    .on_navigation(move |url| is_provider_navigation_allowed(&navigation_provider_id, url))
+    .on_new_window(move |url, _| {
+        if is_provider_navigation_allowed(&popup_provider_id, &url) {
+            tauri::webview::NewWindowResponse::Allow
+        } else {
+            tauri::webview::NewWindowResponse::Deny
+        }
+    })
     .build()
     .map_err(|error| {
         RuntimeError::recoverable(
@@ -263,6 +359,61 @@ pub async fn open_native_provider_container(
             target.display_name
         ),
     ))
+}
+
+pub fn provider_webview_session_policy(
+    provider_id: &str,
+) -> Result<ProviderWebviewSessionPolicy, RuntimeError> {
+    resolve_in_layout_provider_container(provider_id)?;
+
+    let data_store_identifier = match provider_id {
+        "chatgpt" => *b"cyro-chatgpt-v01",
+        "claude" => *b"cyro-claude--v01",
+        "gemini" => *b"cyro-gemini--v01",
+        _ => unreachable!("provider id was already allowlist-validated"),
+    };
+
+    Ok(ProviderWebviewSessionPolicy {
+        incognito: false,
+        data_store_identifier,
+    })
+}
+
+pub fn is_provider_navigation_allowed(provider_id: &str, url: &Url) -> bool {
+    if url.scheme() != "https" {
+        return false;
+    }
+
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+
+    provider_allowed_navigation_hosts(provider_id)
+        .map(|hosts| hosts.iter().any(|allowed_host| *allowed_host == host))
+        .unwrap_or(false)
+}
+
+fn provider_allowed_navigation_hosts(
+    provider_id: &str,
+) -> Result<&'static [&'static str], RuntimeError> {
+    resolve_in_layout_provider_container(provider_id)?;
+
+    match provider_id {
+        "chatgpt" => Ok(&[
+            "chatgpt.com",
+            "auth.openai.com",
+            "auth0.openai.com",
+            "accounts.google.com",
+            "appleid.apple.com",
+        ]),
+        "claude" => Ok(&["claude.ai", "accounts.google.com", "appleid.apple.com"]),
+        "gemini" => Ok(&[
+            "gemini.google.com",
+            "accounts.google.com",
+            "myaccount.google.com",
+        ]),
+        _ => unreachable!("provider id was already allowlist-validated"),
+    }
 }
 
 pub fn resolve_provider_session(
@@ -464,6 +615,13 @@ fn provider_in_layout_bounds_from_viewport(
     })
 }
 
+fn hidden_provider_child_bounds() -> Rect {
+    Rect {
+        position: LogicalPosition::new(-20_000.0, -20_000.0).into(),
+        size: LogicalSize::new(1.0, 1.0).into(),
+    }
+}
+
 fn validate_provider_viewport_bounds(
     provider_id: &str,
     bounds: ProviderViewportBounds,
@@ -472,19 +630,30 @@ fn validate_provider_viewport_bounds(
 
     let values = [bounds.x, bounds.y, bounds.width, bounds.height];
     if values.iter().any(|value| !value.is_finite()) {
-        return Err(invalid_provider_bounds_error("provider viewport bounds must be finite numbers"));
+        return Err(invalid_provider_bounds_error(
+            "provider viewport bounds must be finite numbers",
+        ));
     }
 
     if bounds.x < 0.0 || bounds.y < 0.0 {
-        return Err(invalid_provider_bounds_error("provider viewport origin cannot be negative"));
+        return Err(invalid_provider_bounds_error(
+            "provider viewport origin cannot be negative",
+        ));
     }
 
     if bounds.width < PROVIDER_VIEWPORT_MIN_WIDTH || bounds.height < PROVIDER_VIEWPORT_MIN_HEIGHT {
-        return Err(invalid_provider_bounds_error("provider viewport is too small"));
+        return Err(invalid_provider_bounds_error(
+            "provider viewport is too small",
+        ));
     }
 
-    if values.iter().any(|value| *value > PROVIDER_VIEWPORT_MAX_EDGE) {
-        return Err(invalid_provider_bounds_error("provider viewport bounds are unreasonably large"));
+    if values
+        .iter()
+        .any(|value| *value > PROVIDER_VIEWPORT_MAX_EDGE)
+    {
+        return Err(invalid_provider_bounds_error(
+            "provider viewport bounds are unreasonably large",
+        ));
     }
 
     Ok(ProviderViewportBounds {
@@ -504,40 +673,14 @@ fn invalid_provider_bounds_error(detail: &'static str) -> RuntimeError {
     )
 }
 
-fn close_other_in_layout_provider_webviews(
-    app: &tauri::AppHandle,
-    active_label: &str,
-) -> Result<(), RuntimeError> {
-    for label in [
-        "provider-in-layout-chatgpt",
-        "provider-in-layout-claude",
-        "provider-in-layout-gemini",
-    ] {
-        if label == active_label {
-            continue;
-        }
-
-        if let Some(webview) = app.get_webview(label) {
-            webview.close().map_err(|error| {
-                RuntimeError::recoverable(
-                    "provider_in_layout_close_failed",
-                    "Cyro could not close the previous in-layout provider webview.",
-                    "Close and reopen Cyro before continuing provider container validation.",
-                    Some(error.to_string()),
-                )
-            })?;
-        }
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
+        is_provider_navigation_allowed, provider_webview_session_policy,
         resolve_in_layout_provider_container, resolve_native_provider_container,
         resolve_provider_session, validate_provider_viewport_bounds, ProviderViewportBounds,
     };
+    use tauri::Url;
 
     #[test]
     fn resolves_only_allowlisted_provider_origins() {
@@ -605,10 +748,48 @@ mod tests {
     #[test]
     fn rejects_unknown_in_layout_provider_ids_and_arbitrary_urls() {
         let unknown = resolve_in_layout_provider_container("perplexity").unwrap_err();
-        let arbitrary_url = resolve_in_layout_provider_container("https://chatgpt.com").unwrap_err();
+        let arbitrary_url =
+            resolve_in_layout_provider_container("https://chatgpt.com").unwrap_err();
 
         assert_eq!(unknown.code, "provider_not_allowlisted");
         assert_eq!(arbitrary_url.code, "provider_not_allowlisted");
+    }
+
+    #[test]
+    fn provider_session_policy_is_persistent_and_provider_scoped() {
+        let chatgpt = provider_webview_session_policy("chatgpt").unwrap();
+        let gemini = provider_webview_session_policy("gemini").unwrap();
+
+        assert!(!chatgpt.incognito);
+        assert!(!gemini.incognito);
+        assert_ne!(chatgpt.data_store_identifier, gemini.data_store_identifier);
+    }
+
+    #[test]
+    fn provider_session_policy_rejects_unknown_provider_ids() {
+        let error = provider_webview_session_policy("https://chatgpt.com").unwrap_err();
+
+        assert_eq!(error.code, "provider_not_allowlisted");
+    }
+
+    #[test]
+    fn provider_navigation_allows_provider_owned_auth_redirects_only() {
+        assert!(is_provider_navigation_allowed(
+            "gemini",
+            &Url::parse("https://accounts.google.com/signin/v2/identifier").unwrap()
+        ));
+        assert!(is_provider_navigation_allowed(
+            "chatgpt",
+            &Url::parse("https://auth.openai.com/u/login").unwrap()
+        ));
+        assert!(!is_provider_navigation_allowed(
+            "gemini",
+            &Url::parse("https://example.com/auth").unwrap()
+        ));
+        assert!(!is_provider_navigation_allowed(
+            "gemini",
+            &Url::parse("http://accounts.google.com/signin").unwrap()
+        ));
     }
 
     #[test]

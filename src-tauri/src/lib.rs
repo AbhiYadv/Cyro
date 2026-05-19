@@ -489,6 +489,7 @@ pub fn run() {
             benchmark::run_runtime_benchmark,
             provider_session::get_provider_session,
             provider_session::close_in_layout_provider_container,
+            provider_session::hide_in_layout_provider_container,
             provider_session::open_in_layout_provider_container,
             provider_session::resize_in_layout_provider_container,
             provider_session::open_native_provider_container,

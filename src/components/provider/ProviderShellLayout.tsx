@@ -9,8 +9,8 @@ import {
 } from "../../services/providerShell";
 import { isProviderId } from "../../services/providerSession";
 import {
-  closeInLayoutProviderContainer,
   formatRuntimeError,
+  hideInLayoutProviderContainer,
   openInLayoutProviderContainer,
   openNativeProviderContainer,
   resizeInLayoutProviderContainer
@@ -155,17 +155,20 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
       nativeContainerStatus[previousProvider] === "native_visible"
     ) {
       try {
-        await closeInLayoutProviderContainer(previousProvider);
+        await hideInLayoutProviderContainer(previousProvider);
         setNativeContainerStatus((current) => ({
           ...current,
-          [previousProvider]: defaultContainerStateForProvider(previousProvider)
+          [previousProvider]: "native_hidden"
         }));
-        setNativeContainerMessage((current) => ({ ...current, [previousProvider]: null }));
+        setNativeContainerMessage((current) => ({
+          ...current,
+          [previousProvider]: `${providerDisplayName(previousProvider)} provider session is hidden but not closed.`
+        }));
       } catch (error) {
         setNativeContainerStatus((current) => ({ ...current, [previousProvider]: "native_failed" }));
         setNativeContainerMessage((current) => ({
           ...current,
-          [previousProvider]: formatRuntimeError(error, "In-layout native provider container failed to close.")
+          [previousProvider]: formatRuntimeError(error, "In-layout native provider container failed to hide.")
         }));
       }
     }
@@ -368,6 +371,10 @@ function providerContainerStateFromNativeStatus(status: ProviderNativeContainerS
     return "native_visible";
   }
 
+  if (status === "native_hidden") {
+    return "native_hidden";
+  }
+
   if (status === "separate_window_fallback") {
     return "separate_window_fallback";
   }
@@ -381,10 +388,6 @@ function providerContainerStateFromNativeStatus(status: ProviderNativeContainerS
   }
 
   return "idle";
-}
-
-function defaultContainerStateForProvider(provider: ProviderId): ProviderContainerState {
-  return provider === "chatgpt" ? "iframe_blocked" : "idle";
 }
 
 function waitForNextFrame() {

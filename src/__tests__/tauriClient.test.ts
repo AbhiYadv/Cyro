@@ -5,6 +5,7 @@ import {
   closeInLayoutProviderContainer,
   getProviderSession,
   getRuntimeStatus,
+  hideInLayoutProviderContainer,
   isPromptValid,
   openNativeProviderContainer,
   openInLayoutProviderContainer,
@@ -333,6 +334,28 @@ describe("tauriClient Sprint 0 contract", () => {
     await expect(closeInLayoutProviderContainer("chatgpt", invoker)).resolves.toMatchObject({
       providerId: "chatgpt",
       status: "idle"
+    });
+  });
+
+  it("hides in-layout provider container by provider id only without closing the session", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("hide_in_layout_provider_container");
+      expect(args).toEqual({ providerId: "gemini" });
+      expect(JSON.stringify(args)).not.toContain("https://gemini.google.com");
+      return {
+        providerId: "gemini",
+        displayName: "Gemini",
+        origin: "https://gemini.google.com",
+        windowLabel: "provider-in-layout-gemini",
+        surfaceMechanism: "native_child_webview",
+        status: "native_hidden",
+        message: "Gemini in-layout native provider webview hidden without closing its provider-owned session."
+      } as T;
+    };
+
+    await expect(hideInLayoutProviderContainer("gemini", invoker)).resolves.toMatchObject({
+      providerId: "gemini",
+      status: "native_hidden"
     });
   });
 

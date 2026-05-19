@@ -110,6 +110,7 @@ describe("provider shell state contract", () => {
     expect(shouldAutoOpenProvider("gemini", "idle")).toBe(true);
     expect(shouldAutoOpenProvider("chatgpt", "native_opening")).toBe(false);
     expect(shouldAutoOpenProvider("chatgpt", "native_visible")).toBe(false);
+    expect(shouldAutoOpenProvider("chatgpt", "native_hidden")).toBe(true);
     expect(shouldAutoOpenProvider("chatgpt", "separate_window_fallback")).toBe(false);
     expect(shouldAutoOpenProvider("chatgpt", "native_failed")).toBe(true);
   });
