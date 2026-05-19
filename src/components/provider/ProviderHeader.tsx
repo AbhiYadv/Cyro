@@ -37,14 +37,12 @@ export function ProviderHeader({
       </button>
       <div className="provider-header-title">
         <span>Cyro</span>
-        <strong>{providerHeaderRouteLabel(selectedProvider)}</strong>
-      </div>
-      {statusLabel || control.intent === "stop" ? (
-        <div className="provider-header-status" aria-label="Provider shell status">
-          {statusLabel ? <span>{statusLabel}</span> : null}
-          {control.intent === "stop" ? <span>Generating</span> : null}
+        <div className="provider-header-route-row">
+          <strong>{providerHeaderRouteLabel(selectedProvider)}</strong>
+          {statusLabel ? <small>{statusLabel}</small> : null}
+          {control.intent === "stop" ? <small>Generating</small> : null}
         </div>
-      ) : null}
+      </div>
       <button
         className="diagnostics-toggle"
         type="button"

@@ -21,23 +21,11 @@ function tabStatusVariant(provider: ProviderRouteId, containerStatus: Record<Pro
   return "pending";
 }
 
-function tabStatusLabel(variant: TabStatusVariant): string {
-  switch (variant) {
-    case "ready": return "Ready";
-    case "native_visible": return "Native visible";
-    case "opening": return "Opening";
-    case "failed": return "Failed";
-    case "blocked": return "Blocked";
-    case "pending": return "Pending";
-  }
-}
-
 export function ProviderTabRail({ selectedProvider, nativeContainerStatus, onProviderChange }: ProviderTabRailProps) {
   return (
     <nav className="provider-tab-rail" aria-label="Provider tabs">
       {tabRoutes.map((route) => {
         const variant = tabStatusVariant(route, nativeContainerStatus);
-        const label = tabStatusLabel(variant);
         const isActive = selectedProvider === route;
 
         return (
@@ -50,7 +38,7 @@ export function ProviderTabRail({ selectedProvider, nativeContainerStatus, onPro
             onClick={() => onProviderChange(route)}
           >
             <span className="provider-tab-name">{providerDisplayName(route)}</span>
-            {isActive ? <span className={`provider-tab-chip ${variant}`}>{label}</span> : null}
+            {isActive && route !== "local" ? <span className={`provider-tab-state-dot ${variant}`} aria-hidden="true" /> : null}
           </button>
         );
       })}

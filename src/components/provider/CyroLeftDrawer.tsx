@@ -50,7 +50,6 @@ export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps)
           {providerRoutes.map((route) => (
             <button type="button" key={route}>
               <span>{route}</span>
-              <small>{route === "Local" ? "Ready" : "Shell only"}</small>
             </button>
           ))}
         </section>

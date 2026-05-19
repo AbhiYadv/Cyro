@@ -11,12 +11,6 @@ type ProviderBlockedStateProps = {
   onOpenSeparateWindowFallback?: () => void;
 };
 
-const fallbackOrigins: Record<Exclude<ProviderRouteId, "local">, string> = {
-  chatgpt: "https://chatgpt.com",
-  claude: "https://claude.ai",
-  gemini: "https://gemini.google.com"
-};
-
 export function ProviderBlockedState({
   provider,
   status,
@@ -57,11 +51,9 @@ export function ProviderBlockedState({
     );
   }
 
-  const nativeStatusLabel = nativeContainerStatusLabel(containerState);
-
   return (
     <article className={isBlocked ? "provider-blocked-state blocked" : "provider-blocked-state"} aria-live="polite">
-      <div className="provider-blocked-marker">{nativeStatusLabel ?? (isBlocked ? "Blocked" : "Unvalidated")}</div>
+      <div className="provider-blocked-marker">Provider-owned session</div>
       <div>
         <p className="eyebrow">{providerName}</p>
         <h2>Open {providerName} in Cyro.</h2>
@@ -71,7 +63,7 @@ export function ProviderBlockedState({
       </p>
       <p className="provider-blocked-cause">
         {isBlocked
-          ? "Iframe embedding is blocked, so Cyro uses a visible native provider container for this route."
+          ? "Iframe embedding is blocked; use the visible native provider container or separate-window fallback."
           : "Native provider session validation is pending for this route."}
       </p>
       <div className="provider-container-actions">
@@ -85,9 +77,6 @@ export function ProviderBlockedState({
             Open separate window
           </button>
         ) : null}
-        <a className="provider-fallback-link" href={fallbackOrigins[provider]} target="_blank" rel="noreferrer">
-          Explicit fallback
-        </a>
       </div>
       {nativeContainerMessage ? (
         <p className="provider-native-status" role="status">
@@ -96,21 +85,4 @@ export function ProviderBlockedState({
       ) : null}
     </article>
   );
-}
-
-function nativeContainerStatusLabel(status: ProviderContainerState) {
-  switch (status) {
-    case "native_visible":
-      return "Native visible";
-    case "separate_window_fallback":
-      return "Separate window fallback";
-    case "native_failed":
-      return "Failed";
-    case "native_opening":
-      return "Opening";
-    case "iframe_blocked":
-      return "Blocked";
-    default:
-      return null;
-  }
 }

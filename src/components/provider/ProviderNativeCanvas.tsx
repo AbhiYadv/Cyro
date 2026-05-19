@@ -10,7 +10,6 @@ type ProviderNativeCanvasProps = {
 
 export function ProviderNativeCanvas({
   provider,
-  containerState,
   nativeContainerMessage,
   onOpenSeparateWindowFallback
 }: ProviderNativeCanvasProps) {
@@ -21,7 +20,6 @@ export function ProviderNativeCanvas({
       <div className="provider-native-canvas-label provider-native-canvas-lock">
         <span className="provider-native-lock-mark">Lock</span>
         <strong>Provider-owned session — Cyro cannot read this content.</strong>
-        <small>{providerName} - {nativeCanvasStatusText(containerState)}</small>
         {onOpenSeparateWindowFallback ? (
           <button
             className="provider-canvas-external-action"
@@ -45,16 +43,4 @@ export function ProviderNativeCanvas({
       ) : null}
     </article>
   );
-}
-
-function nativeCanvasStatusText(containerState: ProviderContainerState) {
-  if (containerState === "native_visible") {
-    return "Native webview visible in this region. Login and session persistence are not validated.";
-  }
-
-  if (containerState === "native_opening") {
-    return "Opening native webview.";
-  }
-
-  return "Native provider container state is visible to the user.";
 }

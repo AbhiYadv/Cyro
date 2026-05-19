@@ -111,7 +111,7 @@ describe("provider shell components", () => {
     expect(html).toContain("Iframe embedding is blocked");
     expect(html).toContain("Open in Cyro");
     expect(html).toContain("Open separate window");
-    expect(html).toContain("Explicit fallback");
+    expect(html).not.toContain("Explicit fallback");
     expect(html).not.toContain("CYRO-PROVIDER-011");
   });
 
@@ -175,6 +175,7 @@ describe("provider shell components", () => {
     expect(html).toContain("Provider-owned session — Cyro cannot read this content.");
     expect(html).toContain("Native provider webview reserved region");
     expect(html).toContain("native provider webview opened inside the main Cyro window");
+    expect(html).not.toContain("Login and session persistence are not validated.");
     expect(html).not.toContain("Live");
   });
 
@@ -277,6 +278,7 @@ describe("provider shell components", () => {
     expect(openHtml).toContain("cyro-left-drawer open");
     expect(openHtml).toContain("Search chats");
     expect(openHtml).toContain("Provider sessions");
+    expect(openHtml).not.toContain("Shell only");
     expect(closedHtml).toContain("cyro-left-drawer");
     expect(closedHtml).not.toContain("drawer-scrim");
   });
@@ -334,7 +336,7 @@ describe("provider shell components", () => {
     expect(html).not.toContain("reasoning-pill active");
   });
 
-  it("renders provider tab rail with all four routes and only the active route state chip", () => {
+  it("renders provider tab rail with compact routes and no loud status chips", () => {
     const nativeStatus = { chatgpt: "iframe_blocked" as const, claude: "idle" as const, gemini: "idle" as const };
     const html = renderToString(
       <ProviderTabRail selectedProvider="local" nativeContainerStatus={nativeStatus} onProviderChange={noop} />
@@ -345,9 +347,10 @@ describe("provider shell components", () => {
     expect(html).toContain("ChatGPT");
     expect(html).toContain("Claude");
     expect(html).toContain("Gemini");
-    expect(html).toContain("provider-tab-chip ready");
-    expect(html).not.toContain("provider-tab-chip blocked");
-    expect(html).not.toContain("provider-tab-chip pending");
+    expect(html).not.toContain("provider-tab-chip");
+    expect(html).not.toContain("READY");
+    expect(html).not.toContain("Blocked");
+    expect(html).not.toContain("Pending");
   });
 
   it("marks the active provider tab with aria-selected and active class", () => {
@@ -364,14 +367,15 @@ describe("provider shell components", () => {
     expect(chatgptHtml).toContain("provider-tab active");
   });
 
-  it("shows Native visible chip when provider has native_visible container state", () => {
+  it("keeps native-visible tab state subtle without a loud visible chip", () => {
     const nativeStatus = { chatgpt: "native_visible" as const, claude: "idle" as const, gemini: "idle" as const };
     const html = renderToString(
       <ProviderTabRail selectedProvider="chatgpt" nativeContainerStatus={nativeStatus} onProviderChange={noop} />
     );
 
-    expect(html).toContain("provider-tab-chip native_visible");
-    expect(html).toContain("Native visible");
+    expect(html).toContain("provider-tab-state-dot native_visible");
+    expect(html).not.toContain("provider-tab-chip");
+    expect(html).not.toContain("Native visible");
     expect(html).not.toContain("Live");
   });
 
