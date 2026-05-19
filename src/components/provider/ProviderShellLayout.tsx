@@ -167,9 +167,19 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     }
   }
 
-  const activeContainerState = isProviderId(shellState.selectedProvider)
-    ? nativeContainerStatus[shellState.selectedProvider]
+  const activeProvider = isProviderId(shellState.selectedProvider) ? shellState.selectedProvider : null;
+  const activeContainerState = activeProvider
+    ? nativeContainerStatus[activeProvider]
     : "idle";
+  const isLocalRoute = shellState.selectedProvider === "local";
+  const mainClassName = isLocalRoute ? "provider-shell-main local-mode" : "provider-shell-main provider-mode";
+  const stageClassName = [
+    "provider-chat-stage",
+    isLocalRoute ? "local-stage" : "provider-stage",
+    activeContainerState === "native_visible" ? "native-canvas-active" : null
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className="provider-shell-layout">
@@ -179,7 +189,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
         onClose={() => dispatch({ type: "close_drawer" })}
       />
 
-      <main className="provider-shell-main" aria-label="Cyro provider shell chat prototype">
+      <main className={mainClassName} aria-label="Cyro provider shell chat prototype">
         <ProviderHeader
           selectedProvider={shellState.selectedProvider}
           generationState={shellState.generationState}
@@ -196,15 +206,8 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
           onProviderChange={handleProviderChange}
         />
 
-        <section
-          className={
-            activeContainerState === "native_visible"
-              ? "provider-chat-stage native-canvas-active"
-              : "provider-chat-stage"
-          }
-          aria-label="Provider shell stage"
-        >
-          {shellState.selectedProvider === "local" ? (
+        <section className={stageClassName} aria-label="Provider shell stage">
+          {isLocalRoute ? (
             <div className="provider-home-presence">
               <CyroPresence
                 provider={shellState.selectedProvider}
@@ -213,48 +216,52 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
               />
               <h1>Cyro</h1>
             </div>
-          ) : (
+          ) : activeProvider ? (
             <ProviderContainerSurface
-              provider={shellState.selectedProvider}
+              provider={activeProvider}
               status={shellState.providerSurfaceStatus}
               containerState={activeContainerState}
-              nativeContainerMessage={nativeContainerMessage[shellState.selectedProvider]}
-              onOpenInLayoutContainer={() => handleOpenInLayoutContainer(shellState.selectedProvider)}
-              onOpenSeparateWindowFallback={() => handleOpenSeparateWindowFallback(shellState.selectedProvider)}
+              nativeContainerMessage={nativeContainerMessage[activeProvider]}
+              onOpenInLayoutContainer={() => handleOpenInLayoutContainer(activeProvider)}
+              onOpenSeparateWindowFallback={() => handleOpenSeparateWindowFallback(activeProvider)}
             />
-          )}
+          ) : null}
         </section>
 
-        {composerNotice ? (
+        {isLocalRoute && composerNotice ? (
           <div className="composer-notice" role="status">
             {composerNotice}
           </div>
         ) : null}
 
-        {shellState.diagnosticsOpen ? (
+        {isLocalRoute && shellState.diagnosticsOpen ? (
           <section className="provider-diagnostics-panel" aria-label="Runtime diagnostics">
             <RuntimePanel status={runtimeStatus} onStatusRefresh={onRuntimeRefresh} />
           </section>
         ) : null}
 
-        <CyroComposer
-          selectedProvider={shellState.selectedProvider}
-          reasoningMode={shellState.reasoningMode}
-          generationState={shellState.generationState}
-          toolsOpen={shellState.toolsOpen}
-          prompt={prompt}
-          onPromptChange={setPrompt}
-          onProviderChange={handleProviderChange}
-          onReasoningChange={handleReasoningChange}
-          onToolsToggle={() => dispatch({ type: "toggle_tools" })}
-          onToolsClose={() => dispatch({ type: "close_tools" })}
-          onSend={handleSend}
-          onStop={handleStop}
-        />
+        {isLocalRoute ? (
+          <>
+            <CyroComposer
+              selectedProvider={shellState.selectedProvider}
+              reasoningMode={shellState.reasoningMode}
+              generationState={shellState.generationState}
+              toolsOpen={shellState.toolsOpen}
+              prompt={prompt}
+              onPromptChange={setPrompt}
+              onProviderChange={handleProviderChange}
+              onReasoningChange={handleReasoningChange}
+              onToolsToggle={() => dispatch({ type: "toggle_tools" })}
+              onToolsClose={() => dispatch({ type: "close_tools" })}
+              onSend={handleSend}
+              onStop={handleStop}
+            />
 
-        <span className="composer-placeholder-measure" aria-hidden="true">
-          {shellComposerPlaceholder(shellState.selectedProvider)}
-        </span>
+            <span className="composer-placeholder-measure" aria-hidden="true">
+              {shellComposerPlaceholder(shellState.selectedProvider)}
+            </span>
+          </>
+        ) : null}
       </main>
     </div>
   );

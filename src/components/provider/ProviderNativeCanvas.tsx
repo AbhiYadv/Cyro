@@ -18,10 +18,10 @@ export function ProviderNativeCanvas({
 
   return (
     <article className="provider-native-canvas" aria-label={`${providerName} native provider canvas`}>
-      <div className="provider-native-canvas-label">
-        <span>{providerName}</span>
+      <div className="provider-native-canvas-label provider-native-canvas-lock">
+        <span className="provider-native-lock-mark">Lock</span>
         <strong>Provider-owned session — Cyro cannot read this content.</strong>
-        <small>{nativeCanvasStatusText(containerState)}</small>
+        <small>{providerName} - {nativeCanvasStatusText(containerState)}</small>
         {onOpenSeparateWindowFallback ? (
           <button
             className="provider-canvas-external-action"

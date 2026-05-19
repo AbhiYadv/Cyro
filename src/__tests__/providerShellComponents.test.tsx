@@ -68,7 +68,9 @@ describe("provider shell components", () => {
   it("renders CyroPresence and minimal Cyro heading for the local home state", () => {
     const html = renderToString(<ProviderShellLayout runtimeStatus={runtimeStatus} onRuntimeRefresh={noopAsync} />);
 
+    expect(html).toContain("provider-shell-main local-mode");
     expect(html).toContain("cyro-presence");
+    expect(html).toContain("cyro-composer-shell");
     expect(html).toContain(">Cyro<");
     expect(html).not.toContain("Cyro is ready");
   });
@@ -148,6 +150,8 @@ describe("provider shell components", () => {
     expect(inLayoutHtml).toContain("Provider-owned session — Cyro cannot read this content.");
     expect(inLayoutHtml).toContain("Native provider webview reserved region");
     expect(inLayoutHtml).toContain("inside the main Cyro window");
+    expect(inLayoutHtml).not.toContain("cyro-composer-shell");
+    expect(inLayoutHtml).not.toContain("composer-send-button");
     expect(inLayoutHtml).not.toContain("Open Claude in Cyro.");
     expect(inLayoutHtml).not.toContain("Provider shell is not validated yet.");
     expect(inLayoutHtml).not.toContain("Iframe display is blocked.");
@@ -166,6 +170,7 @@ describe("provider shell components", () => {
     );
 
     expect(html).toContain("provider-native-canvas");
+    expect(html).toContain("provider-native-canvas-lock");
     expect(html).toContain("ChatGPT");
     expect(html).toContain("Provider-owned session — Cyro cannot read this content.");
     expect(html).toContain("Native provider webview reserved region");
@@ -197,6 +202,8 @@ describe("provider shell components", () => {
     expect(blockedHtml).toContain("ChatGPT");
     expect(blockedHtml).toContain("in Cyro.");
     expect(nativeHtml).toContain("provider-native-canvas");
+    expect(nativeHtml).not.toContain("cyro-composer-shell");
+    expect(nativeHtml).not.toContain("composer-send-button");
     expect(nativeHtml).toContain("Native provider webview reserved region");
     expect(nativeHtml).not.toContain("Iframe display is blocked.");
     expect(nativeHtml).not.toContain("Open ChatGPT in Cyro.");
@@ -414,6 +421,10 @@ describe("provider shell components", () => {
     expect(chatgptHtml).toContain("disabled");
     expect(chatgptHtml).not.toContain("composer-send-button");
     expect(chatgptHtml).not.toContain(">Send<");
+    expect(chatgptHtml).not.toContain("reasoning-selector");
+    expect(chatgptHtml).not.toContain(">Fast<");
+    expect(chatgptHtml).not.toContain(">Think<");
+    expect(chatgptHtml).not.toContain(">Pro<");
     expect(geminiHtml).toContain("bridge-pending");
     expect(geminiHtml).toContain("Prompt bridge coming later");
   });

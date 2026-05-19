@@ -1,7 +1,6 @@
 import {
   generationControlForState,
-  providerHeaderRouteLabel,
-  runtimeDiagnosticsMode
+  providerHeaderRouteLabel
 } from "../../services/providerShell";
 import type {
   ProviderShellGenerationState,
@@ -46,8 +45,13 @@ export function ProviderHeader({
           {control.intent === "stop" ? <span>Generating</span> : null}
         </div>
       ) : null}
-      <button className="diagnostics-toggle" type="button" onClick={onDiagnosticsToggle}>
-        Diagnostics {runtimeDiagnosticsMode(diagnosticsOpen)}
+      <button
+        className="diagnostics-toggle"
+        type="button"
+        onClick={onDiagnosticsToggle}
+        aria-label={diagnosticsOpen ? "Collapse diagnostics" : "Open diagnostics"}
+      >
+        Diag
       </button>
     </header>
   );
