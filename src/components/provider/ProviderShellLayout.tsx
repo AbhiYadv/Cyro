@@ -33,7 +33,6 @@ import type {
 import type { RuntimeStatus } from "../../types/runtime";
 import { CyroComposer } from "./CyroComposer";
 import { CyroLeftDrawer } from "./CyroLeftDrawer";
-import { CyroPresence } from "./CyroPresence";
 import { ProviderContainerSurface } from "./ProviderContainerSurface";
 import { ProviderHeader } from "./ProviderHeader";
 import { ProviderTabRail } from "./ProviderTabRail";
@@ -506,13 +505,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
 
         <section className={stageClassName} aria-label="Provider shell stage">
           {isLocalRoute ? (
-            <div className="provider-home-presence star-only-home">
-              <CyroPresence
-                provider={shellState.selectedProvider}
-                status={shellState.providerSurfaceStatus}
-                generationState={shellState.generationState}
-              />
-            </div>
+            <div className="provider-home-presence minimal-local-home" aria-hidden="true" />
           ) : activeProvider ? (
             <ProviderContainerSurface
               provider={activeProvider}

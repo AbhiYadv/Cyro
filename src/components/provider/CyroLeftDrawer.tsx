@@ -58,13 +58,13 @@ export function CyroLeftDrawer({ open, onToggle, onClose, theme = "dark", onThem
           <button type="button">Provider sessions</button>
           <button type="button">Settings</button>
           <button
-            className="drawer-theme-toggle"
+            className="drawer-theme-toggle compact"
             type="button"
             onClick={onThemeToggle}
             aria-label={`Switch to ${nextThemeLabel} theme`}
+            title={`Switch to ${nextThemeLabel} theme`}
           >
-            <span>Theme</span>
-            <strong>{theme === "dark" ? "Dark" : "Light"}</strong>
+            <span className={theme === "dark" ? "theme-icon moon" : "theme-icon sun"} aria-hidden="true" />
           </button>
         </nav>
 

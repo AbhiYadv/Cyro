@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { App } from "../app/App";
 import { CyroComposer } from "../components/provider/CyroComposer";
 import { CyroLeftDrawer } from "../components/provider/CyroLeftDrawer";
-import { CyroPresence } from "../components/provider/CyroPresence";
 import { ProviderBlockedState } from "../components/provider/ProviderBlockedState";
 import { ProviderContainerSurface } from "../components/provider/ProviderContainerSurface";
 import { ProviderNativeCanvas } from "../components/provider/ProviderNativeCanvas";
@@ -65,13 +64,15 @@ describe("provider shell components", () => {
     expect(html).not.toContain("Cyro is ready");
   });
 
-  it("renders CyroPresence and star-only local home state", () => {
+  it("renders minimal local workspace with composer and no star identity", () => {
     const html = renderToString(<ProviderShellLayout runtimeStatus={runtimeStatus} onRuntimeRefresh={noopAsync} />);
 
     expect(html).toContain("provider-shell-main local-mode");
-    expect(html).toContain("provider-home-presence star-only-home");
-    expect(html).toContain("cyro-star-presence");
+    expect(html).toContain("provider-home-presence minimal-local-home");
     expect(html).toContain("cyro-composer-shell");
+    expect(html).toContain("Ask Local");
+    expect(html).not.toContain("cyro-star-presence");
+    expect(html).not.toContain("Cyro star presence");
     expect(html).not.toContain("<h1>Cyro</h1>");
     expect(html).not.toContain("provider-native-canvas-lock");
     expect(html).not.toContain("Protected provider session");
@@ -84,9 +85,12 @@ describe("provider shell components", () => {
     const html = renderToString(<ProviderShellLayout runtimeStatus={runtimeStatus} onRuntimeRefresh={noopAsync} />);
     const canvasHtml = renderToString(<ProviderNativeCanvas provider="chatgpt" containerState="native_visible" />);
 
-    expect(html).toContain("drawer-theme-toggle");
+    expect(html).toContain("drawer-theme-toggle compact");
+    expect(html).toContain("theme-icon");
     expect(html).toContain("aria-label=\"Switch to light theme\"");
-    expect(html).toContain("Theme");
+    expect(html).not.toContain(">Theme<");
+    expect(html).not.toContain(">Dark<");
+    expect(html).not.toContain(">Light<");
     expect(canvasHtml).not.toContain("drawer-theme-toggle");
     expect(canvasHtml).not.toContain("Switch to light theme");
     expect(canvasHtml).not.toContain("Switch to dark theme");
@@ -98,18 +102,6 @@ describe("provider shell components", () => {
     expect(html).not.toContain("What should Cyro help prepare?");
     expect(html).not.toContain("One composer routes work");
     expect(html).not.toContain("Prepare context capsule");
-  });
-
-  it("renders the Cyro-owned animated presence visual", () => {
-    const html = renderToString(<CyroPresence provider="local" status="ready" generationState="idle" />);
-
-    expect(html).toContain("aria-label=\"Cyro star presence\"");
-    expect(html).toContain("cyro-star-body");
-    expect(html).toContain("cyro-star-eye");
-    expect(html).toContain("cyro-star-wave");
-    expect(html).not.toContain("cyro-presence-core");
-    expect(html).not.toContain("cyro-presence-ring");
-    expect(html).not.toContain("OpenHuman");
   });
 
   it("renders ChatGPT blocked state with softened copy and no iframe panel", () => {
