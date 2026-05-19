@@ -63,7 +63,8 @@ Iframe conclusion:
 - No unsafe workaround is permitted. Do not bypass frame, CSP, login, account security, or provider terms protections.
 
 Next implementation path:
-- CYRO-PROVIDER-009 should become Provider Shell Surface v2 using Tauri-native webview/session container research.
+- CYRO-PROVIDER-009 builds the provider shell chat UX prototype only. It is a React UI shell for the unified composer, drawer, tools menu, segmented provider pills, Fast/Think/Pro reasoning pills, Send/Stop control, compact runtime diagnostics, and honest blocked-provider state.
+- CYRO-PROVIDER-010 should become Provider Shell Surface v2 using Tauri-native webview/session container research.
 - Research must compare Tauri child webview and `WebviewWindow` behavior for provider origins loaded as top-level native webviews, not iframes.
 - A native webview may avoid iframe-specific frame restrictions, but it is not approved until provider terms, platform behavior, storage partitioning, navigation limits, lifecycle cleanup, and cookie/DOM isolation are proven.
 - The v2 task must keep provider sessions visible, manual, user-controlled, and isolated from React. It must not add provider APIs, scraping, auto-login, DOM reading, prompt automation, response capture, memory import, cookie capture, credential storage, or protection bypasses.
@@ -81,6 +82,19 @@ Blocked behavior:
 - External browser fallback remains explicit and user-triggered only when embedding is unavailable or blocked.
 
 Manual feasibility findings are not complete until ChatGPT, Claude, and Gemini are each tested in the native app for visible load, manual login, typing/chat usability, and degraded or blocked behavior.
+
+## CYRO-PROVIDER-009 Shell UX Prototype
+
+CYRO-PROVIDER-009 introduces a modern Cyro-owned provider shell around the existing route model:
+- left drawer for search, new chat, recent chats, memory, vault, and provider sessions
+- top provider header with selected route, session status, generation state, and compact diagnostics control
+- full-height chat/provider stage
+- bottom composer with tools button, segmented Local/ChatGPT/Claude/Gemini provider pills, Fast/Think/Pro reasoning pills, and visible Send/Stop control
+- polished blocked state for ChatGPT's blank or blocked iframe feasibility result
+
+This task is UX shell only. The route selector is shell state, not evidence that provider hosting works. ChatGPT, Claude, and Gemini are route prototypes and must be labeled as blocked, unvalidated, or container pending until a native container task proves otherwise. It does not create a provider webview container, does not load provider sessions through Tauri-native webviews, does not send prompts to providers, and does not import provider answers.
+
+Provider shell is not validated yet. Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending. The iframe conclusion remains unchanged: iframe embedding remains a feasibility result, not the final provider-shell solution. ChatGPT is recorded as blank or blocked in an iframe, and Claude/Gemini remain unvalidated until separately tested. The shell may present selected provider routes and explicit fallback links, but it must not claim provider login or chat works inside Cyro. CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture.
 
 ## Session Isolation Questions
 

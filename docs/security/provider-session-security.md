@@ -22,7 +22,13 @@ Current approved behavior:
 
 The 2026-05-18 feasibility review found that the current embedded shell is iframe-based. ChatGPT was observed as blank or blocked inside the Cyro layout, so iframe embedding is likely unsuitable for final provider shell UX. Claude and Gemini were not manually validated in this review, so no embedded-session success is claimed for them.
 
-This finding does not authorize a bypass. The next safe path is Provider Shell Surface v2 research using Tauri-native child webview or `WebviewWindow` session containers, with explicit proof that React cannot read provider cookies, tokens, DOM, or response content.
+This finding does not authorize a bypass. The next safe container path is Tauri-native child webview or `WebviewWindow` session container research, with explicit proof that React cannot read provider cookies, tokens, DOM, or response content.
+
+## CYRO-PROVIDER-009 Shell UX Security Addendum
+
+CYRO-PROVIDER-009 is a React shell UX prototype only. It may render the Cyro-owned header, drawer, tools tray, route selector, reasoning selector, Send/Stop control, compact diagnostics, and blocked-provider explanation. Provider shell is not validated yet. Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending.
+
+It does not authorize or implement provider APIs, provider SDKs, scraping, DOM reading, auto-login, credential storage, cookie capture, cookie export, prompt injection, automated prompt sending, provider response capture, provider memory import, or bypass behavior. Provider routes remain visible shell state until a separate Tauri-native provider container research task proves an acceptable session boundary. Iframe embedding remains a feasibility result, not the final provider-shell solution. CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture.
 
 ## Future Embedded Session Conditions
 
