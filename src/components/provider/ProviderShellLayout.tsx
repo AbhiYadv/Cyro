@@ -1,10 +1,11 @@
-import { FormEvent, useReducer, useState } from "react";
+import { FormEvent, useEffect, useReducer, useState } from "react";
 import { RuntimePanel } from "../runtime/RuntimePanel";
 import {
   defaultProviderShellState,
   providerDisplayName,
   providerShellReducer,
-  shellComposerPlaceholder
+  shellComposerPlaceholder,
+  shouldAutoOpenProvider
 } from "../../services/providerShell";
 import { isProviderId } from "../../services/providerSession";
 import {
@@ -47,6 +48,17 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     claude: null,
     gemini: null
   });
+
+  // Auto-open in-layout container when user selects a provider tab.
+  // nativeContainerStatus and handleOpenInLayoutContainer intentionally omitted — we only want this to fire on tab change.
+  useEffect(() => {
+    const provider = shellState.selectedProvider;
+    if (!isProviderId(provider)) return;
+    if (shouldAutoOpenProvider(provider, nativeContainerStatus[provider])) {
+      void handleOpenInLayoutContainer(provider);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shellState.selectedProvider]);
 
   async function handleProviderChange(provider: ProviderRouteId) {
     const previousProvider = shellState.selectedProvider;
@@ -170,7 +182,6 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
       <main className="provider-shell-main" aria-label="Cyro provider shell chat prototype">
         <ProviderHeader
           selectedProvider={shellState.selectedProvider}
-          reasoningMode={shellState.reasoningMode}
           generationState={shellState.generationState}
           providerSurfaceStatus={shellState.providerSurfaceStatus}
           providerContainerState={activeContainerState}

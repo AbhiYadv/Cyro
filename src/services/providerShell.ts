@@ -1,4 +1,4 @@
-import type { ProviderRouteId } from "../types/provider";
+import type { ProviderContainerState, ProviderRouteId } from "../types/provider";
 
 export type ProviderShellReasoningMode = "fast" | "think" | "pro";
 export type ProviderShellGenerationState = "idle" | "starting" | "streaming" | "cancelling" | "cancelled" | "completed" | "failed";
@@ -68,24 +68,18 @@ export function shellComposerPlaceholder(provider: ProviderRouteId) {
   return "Prompt bridge pending";
 }
 
-export function providerRouteQualifier(provider: ProviderRouteId) {
-  if (provider === "local") {
-    return "";
-  }
-
-  if (provider === "chatgpt") {
-    return "Blocked";
-  }
-
-  return "Prototype";
+export function providerRouteQualifier(_provider: ProviderRouteId) {
+  return "";
 }
 
 export function providerHeaderRouteLabel(provider: ProviderRouteId) {
-  if (provider === "local") {
-    return providerDisplayName(provider);
-  }
+  return providerDisplayName(provider);
+}
 
-  return `${providerDisplayName(provider)} route prototype`;
+export function shouldAutoOpenProvider(provider: ProviderRouteId, containerState: ProviderContainerState | undefined): boolean {
+  if (provider === "local") return false;
+  if (containerState === "native_opening" || containerState === "native_visible" || containerState === "separate_window_fallback") return false;
+  return true;
 }
 
 export function providerShellStatusLabel(status: ProviderSurfaceStatus) {

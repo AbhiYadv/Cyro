@@ -105,7 +105,7 @@ describe("provider shell components", () => {
     expect(html).toContain("Iframe embedding is blocked.");
     expect(html).toContain("blank or blocked iframe");
     expect(html).toContain("A native provider container is being validated for this route.");
-    expect(html).toContain("Open in-layout container");
+    expect(html).not.toContain("Open in-layout container");
     expect(html).toContain("Separate window fallback");
     expect(html).toContain("No DOM, cookie, credential, prompt, or response capture.");
     expect(html).toContain("Explicit fallback");
@@ -142,9 +142,12 @@ describe("provider shell components", () => {
 
     expect(inLayoutHtml).toContain("provider-native-canvas");
     expect(inLayoutHtml).toContain("Provider-owned session — Cyro cannot read this content.");
+    expect(inLayoutHtml).toContain("Native provider webview reserved region");
     expect(inLayoutHtml).toContain("inside the main Cyro window");
+    expect(inLayoutHtml).not.toContain("Native provider session pending.");
     expect(inLayoutHtml).not.toContain("Provider shell is not validated yet.");
     expect(inLayoutHtml).not.toContain("Iframe display is blocked.");
+    expect(inLayoutHtml).not.toContain("Live");
     expect(fallbackHtml).toContain("Separate window fallback");
     expect(fallbackHtml).toContain("fallback only");
   });
@@ -161,7 +164,9 @@ describe("provider shell components", () => {
     expect(html).toContain("provider-native-canvas");
     expect(html).toContain("ChatGPT");
     expect(html).toContain("Provider-owned session — Cyro cannot read this content.");
+    expect(html).toContain("Native provider webview reserved region");
     expect(html).toContain("native provider webview opened inside the main Cyro window");
+    expect(html).not.toContain("Live");
   });
 
   it("renders iframe blocked card only for iframe_blocked state and not native_visible", () => {
@@ -186,7 +191,9 @@ describe("provider shell components", () => {
     expect(blockedHtml).toContain("Iframe embedding is blocked.");
     expect(blockedHtml).toContain("blank or blocked iframe");
     expect(nativeHtml).toContain("provider-native-canvas");
+    expect(nativeHtml).toContain("Native provider webview reserved region");
     expect(nativeHtml).not.toContain("Iframe display is blocked.");
+    expect(nativeHtml).not.toContain("Native provider session pending.");
     expect(nativeHtml).not.toContain("blank or blocked iframe");
   });
 
@@ -194,7 +201,6 @@ describe("provider shell components", () => {
     const geminiHtml = renderToString(
       <ProviderHeader
         selectedProvider="gemini"
-        reasoningMode="fast"
         generationState="idle"
         providerSurfaceStatus="unvalidated"
         diagnosticsOpen={false}
@@ -205,7 +211,6 @@ describe("provider shell components", () => {
     const localHtml = renderToString(
       <ProviderHeader
         selectedProvider="local"
-        reasoningMode="fast"
         generationState="idle"
         providerSurfaceStatus="ready"
         diagnosticsOpen={false}
@@ -214,7 +219,9 @@ describe("provider shell components", () => {
       />
     );
 
-    expect(geminiHtml).toContain("Gemini route prototype");
+    expect(geminiHtml).toContain(">Gemini<");
+    expect(geminiHtml).not.toContain("route prototype");
+    expect(geminiHtml).not.toContain("Live");
     expect(geminiHtml).toContain("Container pending");
     expect(localHtml).toContain(">Local<");
     expect(localHtml).not.toContain("Container pending");
@@ -224,7 +231,6 @@ describe("provider shell components", () => {
     const html = renderToString(
       <ProviderHeader
         selectedProvider="chatgpt"
-        reasoningMode="fast"
         generationState="idle"
         providerSurfaceStatus="blocked"
         providerContainerState="native_visible"
@@ -234,9 +240,11 @@ describe("provider shell components", () => {
       />
     );
 
-    expect(html).toContain("ChatGPT route prototype");
+    expect(html).toContain(">ChatGPT<");
+    expect(html).not.toContain("route prototype");
     expect(html).toContain("Native visible");
     expect(html).not.toContain("Blocked iframe");
+    expect(html).not.toContain("Live");
   });
 
   it("renders the tools sheet when opened", () => {
@@ -305,9 +313,10 @@ describe("provider shell components", () => {
     expect(html).toContain("provider-pill active");
     expect(html).toContain("Local");
     expect(html).toContain("ChatGPT");
-    expect(html).toContain("Prototype");
     expect(html).toContain("Claude");
     expect(html).toContain("Gemini");
+    expect(html).not.toContain("Prototype");
+    expect(html).not.toContain("Blocked");
     expect(html).toContain("reasoning-pill active");
   });
 
@@ -412,5 +421,90 @@ describe("provider shell components", () => {
     expect(tabHtml).not.toContain("login");
     expect(canvasHtml).not.toContain("session validated");
     expect(canvasHtml).not.toContain("login");
+  });
+
+  it("renders calm opening state when native container is opening", () => {
+    const html = renderToString(
+      <ProviderBlockedState provider="chatgpt" status="blocked" containerState="native_opening" />
+    );
+
+    expect(html).toContain("Opening native provider session…");
+    expect(html).toContain("No DOM, cookie, credential, prompt, or response capture.");
+    expect(html).not.toContain("Native provider session pending.");
+    expect(html).not.toContain("Open in-layout container");
+    expect(html).not.toContain("Retry native session");
+  });
+
+  it("renders retry button when native container has failed", () => {
+    const html = renderToString(
+      <ProviderBlockedState
+        provider="chatgpt"
+        status="blocked"
+        containerState="native_failed"
+        onOpenInLayoutContainer={noop}
+      />
+    );
+
+    expect(html).toContain("Retry native session");
+    expect(html).not.toContain("Open in-layout container");
+    expect(html).not.toContain("Opening native provider session");
+  });
+
+  it("renders separate window action button on native canvas when handler provided", () => {
+    const html = renderToString(
+      <ProviderNativeCanvas
+        provider="chatgpt"
+        containerState="native_visible"
+        onOpenSeparateWindowFallback={noop}
+      />
+    );
+
+    expect(html).toContain("Open in separate window");
+    expect(html).toContain("provider-canvas-external-action");
+  });
+
+  it("passes separate window action through the native visible container surface", () => {
+    const html = renderToString(
+      <ProviderContainerSurface
+        provider="chatgpt"
+        status="blocked"
+        containerState="native_visible"
+        onOpenSeparateWindowFallback={noop}
+      />
+    );
+
+    expect(html).toContain("provider-native-canvas");
+    expect(html).toContain("Open in separate window");
+    expect(html).not.toContain("Native provider session pending.");
+  });
+
+  it("does not render separate window action on canvas when no handler provided", () => {
+    const html = renderToString(
+      <ProviderNativeCanvas provider="chatgpt" containerState="native_visible" />
+    );
+
+    expect(html).not.toContain("Open in separate window");
+    expect(html).not.toContain("provider-canvas-external-action");
+  });
+
+  it("does not render reasoning mode or Idle in provider header", () => {
+    const html = renderToString(
+      <ProviderHeader
+        selectedProvider="claude"
+        generationState="idle"
+        providerSurfaceStatus="unvalidated"
+        diagnosticsOpen={false}
+        onDrawerToggle={noop}
+        onDiagnosticsToggle={noop}
+      />
+    );
+
+    expect(html).not.toContain(">fast<");
+    expect(html).not.toContain(">think<");
+    expect(html).not.toContain(">pro<");
+    expect(html).not.toContain(">Idle<");
+    expect(html).not.toContain("route prototype");
+    expect(html).not.toContain("Live");
+    expect(html).toContain(">Claude<");
   });
 });

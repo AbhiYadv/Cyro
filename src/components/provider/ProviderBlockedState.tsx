@@ -41,6 +41,22 @@ export function ProviderBlockedState({
   }
 
   const isBlocked = status === "blocked";
+
+  if (containerState === "native_opening") {
+    return (
+      <article className="provider-blocked-state provider-opening-state" aria-live="polite">
+        <div className="provider-opening-pulse" aria-hidden="true" />
+        <h2>Opening native provider session…</h2>
+        <p className="provider-native-boundary">No DOM, cookie, credential, prompt, or response capture.</p>
+        {nativeContainerMessage ? (
+          <p className="provider-native-status" role="status">
+            {nativeContainerMessage}
+          </p>
+        ) : null}
+      </article>
+    );
+  }
+
   const nativeStatusLabel = nativeContainerStatusLabel(containerState);
 
   return (
@@ -58,23 +74,13 @@ export function ProviderBlockedState({
       </p>
       <p className="provider-native-boundary">No DOM, cookie, credential, prompt, or response capture.</p>
       <div className="provider-container-actions">
-        {onOpenInLayoutContainer ? (
-          <button
-            className="provider-native-button"
-            type="button"
-            onClick={onOpenInLayoutContainer}
-            disabled={containerState === "native_opening"}
-          >
-            {containerState === "native_opening" ? "Opening in-layout container" : "Open in-layout container"}
+        {containerState === "native_failed" && onOpenInLayoutContainer ? (
+          <button className="provider-native-button" type="button" onClick={onOpenInLayoutContainer}>
+            Retry native session
           </button>
         ) : null}
         {onOpenSeparateWindowFallback ? (
-          <button
-            className="provider-native-button secondary"
-            type="button"
-            onClick={onOpenSeparateWindowFallback}
-            disabled={containerState === "native_opening"}
-          >
+          <button className="provider-native-button secondary" type="button" onClick={onOpenSeparateWindowFallback}>
             Separate window fallback
           </button>
         ) : null}

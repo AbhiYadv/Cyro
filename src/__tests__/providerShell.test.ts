@@ -6,7 +6,8 @@ import {
   providerSurfaceStatusForRoute,
   runtimeDiagnosticsMode,
   shellComposerPlaceholder,
-  shellTools
+  shellTools,
+  shouldAutoOpenProvider
 } from "../services/providerShell";
 
 describe("provider shell state contract", () => {
@@ -100,5 +101,16 @@ describe("provider shell state contract", () => {
   it("keeps runtime diagnostics compact until explicitly expanded", () => {
     expect(runtimeDiagnosticsMode(false)).toBe("compact");
     expect(runtimeDiagnosticsMode(true)).toBe("expanded");
+  });
+
+  it("auto-opens provider tabs only when the selected provider needs an in-layout native container", () => {
+    expect(shouldAutoOpenProvider("local", "idle")).toBe(false);
+    expect(shouldAutoOpenProvider("chatgpt", "idle")).toBe(true);
+    expect(shouldAutoOpenProvider("claude", "idle")).toBe(true);
+    expect(shouldAutoOpenProvider("gemini", "idle")).toBe(true);
+    expect(shouldAutoOpenProvider("chatgpt", "native_opening")).toBe(false);
+    expect(shouldAutoOpenProvider("chatgpt", "native_visible")).toBe(false);
+    expect(shouldAutoOpenProvider("chatgpt", "separate_window_fallback")).toBe(false);
+    expect(shouldAutoOpenProvider("chatgpt", "native_failed")).toBe(true);
   });
 });

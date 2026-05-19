@@ -5,12 +5,14 @@ type ProviderNativeCanvasProps = {
   provider: ProviderRouteId;
   containerState: ProviderContainerState;
   nativeContainerMessage?: string | null;
+  onOpenSeparateWindowFallback?: () => void;
 };
 
 export function ProviderNativeCanvas({
   provider,
   containerState,
-  nativeContainerMessage
+  nativeContainerMessage,
+  onOpenSeparateWindowFallback
 }: ProviderNativeCanvasProps) {
   const providerName = providerDisplayName(provider);
 
@@ -20,6 +22,16 @@ export function ProviderNativeCanvas({
         <span>{providerName}</span>
         <strong>Provider-owned session — Cyro cannot read this content.</strong>
         <small>{nativeCanvasStatusText(containerState)}</small>
+        {onOpenSeparateWindowFallback ? (
+          <button
+            className="provider-canvas-external-action"
+            type="button"
+            onClick={onOpenSeparateWindowFallback}
+            aria-label="Open in separate window"
+          >
+            Open in separate window
+          </button>
+        ) : null}
       </div>
       <div className="provider-native-canvas-body" aria-hidden="true">
         <div className="provider-native-canvas-reservation">

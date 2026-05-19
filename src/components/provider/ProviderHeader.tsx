@@ -6,14 +6,12 @@ import {
 } from "../../services/providerShell";
 import type {
   ProviderShellGenerationState,
-  ProviderShellReasoningMode,
   ProviderSurfaceStatus
 } from "../../services/providerShell";
 import type { ProviderContainerState, ProviderRouteId } from "../../types/provider";
 
 type ProviderHeaderProps = {
   selectedProvider: ProviderRouteId;
-  reasoningMode: ProviderShellReasoningMode;
   generationState: ProviderShellGenerationState;
   providerSurfaceStatus: ProviderSurfaceStatus;
   providerContainerState?: ProviderContainerState;
@@ -24,7 +22,6 @@ type ProviderHeaderProps = {
 
 export function ProviderHeader({
   selectedProvider,
-  reasoningMode,
   generationState,
   providerSurfaceStatus,
   providerContainerState = "idle",
@@ -45,8 +42,7 @@ export function ProviderHeader({
       </div>
       <div className="provider-header-status" aria-label="Provider shell status">
         <span>{providerHeaderStatusLabel(providerSurfaceStatus, providerContainerState)}</span>
-        <span>{reasoningMode}</span>
-        <span>{control.intent === "stop" ? "Generating" : "Idle"}</span>
+        {control.intent === "stop" ? <span>Generating</span> : null}
       </div>
       <button className="diagnostics-toggle" type="button" onClick={onDiagnosticsToggle}>
         Diagnostics: {runtimeDiagnosticsMode(diagnosticsOpen)}
