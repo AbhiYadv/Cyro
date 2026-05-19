@@ -46,9 +46,10 @@ export function CyroComposer({
   onStop
 }: CyroComposerProps) {
   const control = generationControlForState(generationState);
+  const isLocalRoute = selectedProvider === "local";
 
   return (
-    <div className="cyro-composer-shell">
+    <div className={isLocalRoute ? "cyro-composer-shell" : "cyro-composer-shell bridge-pending"}>
       <ProviderToolsMenu open={toolsOpen} onClose={onToolsClose} />
       <form className="cyro-composer" onSubmit={onSend}>
         <textarea
@@ -56,6 +57,7 @@ export function CyroComposer({
           placeholder={shellComposerPlaceholder(selectedProvider)}
           value={prompt}
           rows={2}
+          disabled={!isLocalRoute}
           onChange={(event) => onPromptChange(event.target.value)}
         />
         <div className="composer-control-row">

@@ -26,6 +26,7 @@ import { CyroLeftDrawer } from "./CyroLeftDrawer";
 import { CyroPresence } from "./CyroPresence";
 import { ProviderContainerSurface } from "./ProviderContainerSurface";
 import { ProviderHeader } from "./ProviderHeader";
+import { ProviderTabRail } from "./ProviderTabRail";
 
 type ProviderShellLayoutProps = {
   runtimeStatus: RuntimeStatus;
@@ -178,6 +179,12 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
           onDiagnosticsToggle={() => dispatch({ type: "toggle_diagnostics" })}
         />
 
+        <ProviderTabRail
+          selectedProvider={shellState.selectedProvider}
+          nativeContainerStatus={nativeContainerStatus}
+          onProviderChange={handleProviderChange}
+        />
+
         <section
           className={
             activeContainerState === "native_visible"
@@ -193,7 +200,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
                 status={shellState.providerSurfaceStatus}
                 generationState={shellState.generationState}
               />
-              <h1>Cyro is ready</h1>
+              <h1>Cyro</h1>
             </div>
           ) : (
             <ProviderContainerSurface

@@ -48,18 +48,13 @@ export function ProviderBlockedState({
       <div className="provider-blocked-marker">{nativeStatusLabel ?? (isBlocked ? "Blocked" : "Unvalidated")}</div>
       <div>
         <p className="eyebrow">{providerRouteStatusText(provider)}</p>
-        <h2>Provider shell is not validated yet.</h2>
+        <h2>Native provider session pending.</h2>
       </div>
-      <p className="provider-blocked-cause">{isBlocked ? "Iframe display is blocked." : "Container pending."}</p>
+      <p className="provider-blocked-cause">{isBlocked ? "Iframe embedding is blocked." : "Native session validation pending."}</p>
       <p>
         {isBlocked
-          ? `${providerName} returned a blank or blocked iframe in the feasibility review. Cyro will not pretend this embedded session works.`
-          : `${providerName} is available as a route in the shell prototype, but manual embedded-session validation is still pending.`}
-      </p>
-      <p>
-        Iframe embedding remains a feasibility result, not the final provider-shell solution. CYRO-PROVIDER-011 must
-        determine whether a Tauri-native in-layout webview container can host provider-owned content with no DOM, cookie,
-        credential, prompt, or response capture.
+          ? `${providerName} returned a blank or blocked iframe in the feasibility review. A native provider container is being validated for this route.`
+          : `${providerName} is available as a route in the shell, but native provider session validation is next.`}
       </p>
       <p className="provider-native-boundary">No DOM, cookie, credential, prompt, or response capture.</p>
       <div className="provider-container-actions">

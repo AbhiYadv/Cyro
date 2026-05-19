@@ -65,7 +65,7 @@ export function shellComposerPlaceholder(provider: ProviderRouteId) {
     return "Ask Local";
   }
 
-  return `Draft for ${providerDisplayName(provider)} route prototype`;
+  return "Prompt bridge pending";
 }
 
 export function providerRouteQualifier(provider: ProviderRouteId) {

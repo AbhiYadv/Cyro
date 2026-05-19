@@ -18,7 +18,7 @@ export function ProviderNativeCanvas({
     <article className="provider-native-canvas" aria-label={`${providerName} native provider canvas`}>
       <div className="provider-native-canvas-label">
         <span>{providerName}</span>
-        <strong>Provider-owned native session. Cyro cannot read this content.</strong>
+        <strong>Provider-owned session — Cyro cannot read this content.</strong>
         <small>{nativeCanvasStatusText(containerState)}</small>
       </div>
       <div className="provider-native-canvas-body" aria-hidden="true">

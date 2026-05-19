@@ -17,12 +17,14 @@ describe("provider shell state contract", () => {
     });
 
     expect(next.selectedProvider).toBe("claude");
-    expect(shellComposerPlaceholder(next.selectedProvider)).toBe("Draft for Claude route prototype");
+    expect(shellComposerPlaceholder(next.selectedProvider)).toBe("Prompt bridge pending");
   });
 
-  it("keeps Local placeholder separate from provider validation wording", () => {
+  it("keeps Local placeholder separate from provider bridge-pending wording", () => {
     expect(shellComposerPlaceholder("local")).toBe("Ask Local");
-    expect(shellComposerPlaceholder("local")).not.toContain("route prototype");
+    expect(shellComposerPlaceholder("local")).not.toContain("Prompt bridge pending");
+    expect(shellComposerPlaceholder("chatgpt")).toBe("Prompt bridge pending");
+    expect(shellComposerPlaceholder("gemini")).toBe("Prompt bridge pending");
   });
 
   it("uses provider pill state rather than raw route select behavior", () => {
