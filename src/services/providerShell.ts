@@ -3,6 +3,9 @@ import type { ProviderContainerState, ProviderRouteId, ProviderViewportBounds } 
 export type ProviderShellReasoningMode = "fast" | "think" | "pro";
 export type ProviderShellGenerationState = "idle" | "starting" | "streaming" | "cancelling" | "cancelled" | "completed" | "failed";
 export type ProviderSurfaceStatus = "ready" | "blocked" | "unvalidated" | "fallback";
+export type CyroTheme = "dark" | "light";
+
+export const CYRO_THEME_STORAGE_KEY = "cyro.theme";
 
 export type ProviderShellState = {
   selectedProvider: ProviderRouteId;
@@ -118,6 +121,14 @@ export function shouldSyncProviderViewportBounds(
   }
 
   return normalizeProviderViewportBounds(bounds) !== null;
+}
+
+export function resolveCyroTheme(theme: string | null | undefined): CyroTheme {
+  return theme === "light" || theme === "dark" ? theme : "dark";
+}
+
+export function nextCyroTheme(theme: CyroTheme): CyroTheme {
+  return theme === "dark" ? "light" : "dark";
 }
 
 export function providerShellStatusLabel(status: ProviderSurfaceStatus) {

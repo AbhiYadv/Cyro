@@ -1,10 +1,13 @@
 import { FormEvent, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { RuntimePanel } from "../runtime/RuntimePanel";
 import {
+  CYRO_THEME_STORAGE_KEY,
   defaultProviderShellState,
+  nextCyroTheme,
   normalizeProviderViewportBounds,
   providerDisplayName,
   providerShellReducer,
+  resolveCyroTheme,
   shellComposerPlaceholder,
   shouldAutoOpenProvider,
   shouldSyncProviderViewportBounds
@@ -19,7 +22,7 @@ import {
   providerReload,
   resizeInLayoutProviderContainer
 } from "../../services/tauriClient";
-import type { ProviderShellReasoningMode } from "../../services/providerShell";
+import type { CyroTheme, ProviderShellReasoningMode } from "../../services/providerShell";
 import type {
   ProviderContainerState,
   ProviderId,
@@ -47,6 +50,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
   const providerViewportRef = useRef<HTMLDivElement | null>(null);
   const [prompt, setPrompt] = useState("");
   const [composerNotice, setComposerNotice] = useState<string | null>(null);
+  const [theme, setTheme] = useState<CyroTheme>(readStoredCyroTheme);
   const [nativeContainerStatus, setNativeContainerStatus] = useState<Record<ProviderId, ProviderContainerState>>({
     chatgpt: "iframe_blocked",
     claude: "idle",
@@ -72,6 +76,16 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     ? nativeContainerStatus[activeProvider]
     : "idle";
   const activeProviderLoadingMask = activeProvider ? providerLoadingMask[activeProvider] : false;
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.cyroTheme = theme;
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CYRO_THEME_STORAGE_KEY, theme);
+    }
+  }, [theme]);
 
   const beginProviderLoadingMask = useCallback((provider: ProviderId) => {
     const startedAt = Date.now();
@@ -300,6 +314,10 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     dispatch({ type: "select_reasoning", reasoningMode });
   }
 
+  function handleThemeToggle() {
+    setTheme((current) => nextCyroTheme(current));
+  }
+
   function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -457,11 +475,13 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     .join(" ");
 
   return (
-    <div className="provider-shell-layout">
+    <div className="provider-shell-layout" data-cyro-theme={theme}>
       <CyroLeftDrawer
         open={shellState.drawerOpen}
         onToggle={() => dispatch({ type: "toggle_drawer" })}
         onClose={() => dispatch({ type: "close_drawer" })}
+        theme={theme}
+        onThemeToggle={handleThemeToggle}
       />
 
       <main className={mainClassName} aria-label="Cyro provider shell chat prototype">
@@ -492,7 +512,6 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
                 status={shellState.providerSurfaceStatus}
                 generationState={shellState.generationState}
               />
-              <h1>Cyro</h1>
             </div>
           ) : activeProvider ? (
             <ProviderContainerSurface
@@ -587,4 +606,12 @@ function waitForMs(durationMs: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, durationMs);
   });
+}
+
+function readStoredCyroTheme(): CyroTheme {
+  if (typeof window === "undefined") {
+    return "dark";
+  }
+
+  return resolveCyroTheme(window.localStorage.getItem(CYRO_THEME_STORAGE_KEY));
 }

@@ -65,16 +65,30 @@ describe("provider shell components", () => {
     expect(html).not.toContain("Cyro is ready");
   });
 
-  it("renders CyroPresence and minimal Cyro heading for the local home state", () => {
+  it("renders CyroPresence and star-only local home state", () => {
     const html = renderToString(<ProviderShellLayout runtimeStatus={runtimeStatus} onRuntimeRefresh={noopAsync} />);
 
     expect(html).toContain("provider-shell-main local-mode");
     expect(html).toContain("cyro-star-presence");
     expect(html).toContain("cyro-composer-shell");
-    expect(html).toContain(">Cyro<");
+    expect(html).not.toContain("<h1>Cyro</h1>");
+    expect(html).not.toContain("provider-native-canvas-lock");
+    expect(html).not.toContain("Protected provider session");
     expect(html).not.toContain("provider-native-loading");
     expect(html).not.toContain("Opening provider session");
     expect(html).not.toContain("Cyro is ready");
+  });
+
+  it("renders a shell theme toggle without placing theme controls inside provider-owned canvas", () => {
+    const html = renderToString(<ProviderShellLayout runtimeStatus={runtimeStatus} onRuntimeRefresh={noopAsync} />);
+    const canvasHtml = renderToString(<ProviderNativeCanvas provider="chatgpt" containerState="native_visible" />);
+
+    expect(html).toContain("drawer-theme-toggle");
+    expect(html).toContain("aria-label=\"Switch to light theme\"");
+    expect(html).toContain("Theme");
+    expect(canvasHtml).not.toContain("drawer-theme-toggle");
+    expect(canvasHtml).not.toContain("Switch to light theme");
+    expect(canvasHtml).not.toContain("Switch to dark theme");
   });
 
   it("does not require the old verbose home headline or feature chips", () => {

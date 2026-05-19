@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   defaultProviderShellState,
   generationControlForState,
+  nextCyroTheme,
   normalizeProviderViewportBounds,
   providerShellReducer,
   providerSurfaceStatusForRoute,
+  resolveCyroTheme,
   runtimeDiagnosticsMode,
   shellComposerPlaceholder,
   shellTools,
@@ -193,5 +195,14 @@ describe("provider shell state contract", () => {
       height: 900
     })).toBe(false);
     expect(normalizeProviderViewportBounds(null)).toBeNull();
+  });
+
+  it("defaults theme state to dark and toggles explicitly to light", () => {
+    expect(resolveCyroTheme(null)).toBe("dark");
+    expect(resolveCyroTheme("light")).toBe("light");
+    expect(resolveCyroTheme("dark")).toBe("dark");
+    expect(resolveCyroTheme("system")).toBe("dark");
+    expect(nextCyroTheme("dark")).toBe("light");
+    expect(nextCyroTheme("light")).toBe("dark");
   });
 });

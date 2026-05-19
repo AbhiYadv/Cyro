@@ -1,7 +1,11 @@
+import type { CyroTheme } from "../../services/providerShell";
+
 type CyroLeftDrawerProps = {
   open: boolean;
   onToggle: () => void;
   onClose: () => void;
+  theme?: CyroTheme;
+  onThemeToggle?: () => void;
 };
 
 const recentChats = [
@@ -13,7 +17,9 @@ const recentChats = [
 
 const providerRoutes = ["Local", "ChatGPT", "Claude", "Gemini"];
 
-export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps) {
+export function CyroLeftDrawer({ open, onToggle, onClose, theme = "dark", onThemeToggle }: CyroLeftDrawerProps) {
+  const nextThemeLabel = theme === "dark" ? "light" : "dark";
+
   return (
     <>
       {open ? <button className="drawer-scrim" type="button" aria-label="Close left drawer" onClick={onClose} /> : null}
@@ -51,6 +57,15 @@ export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps)
           <button type="button">Vault</button>
           <button type="button">Provider sessions</button>
           <button type="button">Settings</button>
+          <button
+            className="drawer-theme-toggle"
+            type="button"
+            onClick={onThemeToggle}
+            aria-label={`Switch to ${nextThemeLabel} theme`}
+          >
+            <span>Theme</span>
+            <strong>{theme === "dark" ? "Dark" : "Light"}</strong>
+          </button>
         </nav>
 
         <section className="drawer-provider-routes" aria-label="Provider route placeholders">
