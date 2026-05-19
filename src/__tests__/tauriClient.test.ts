@@ -6,6 +6,7 @@ import {
   getRuntimeStatus,
   isPromptValid,
   openNativeProviderContainer,
+  openInLayoutProviderContainer,
   runRuntimeBenchmark,
   sendLocalPrompt,
   sendLocalPromptStreaming,
@@ -237,8 +238,8 @@ describe("tauriClient Sprint 0 contract", () => {
         origin: "https://gemini.google.com",
         windowLabel: "provider-gemini",
         surfaceMechanism: "native_webview_window",
-        status: "visible",
-        message: "Gemini native provider window opened. Provider-owned content remains visible and user-controlled."
+        status: "separate_window_fallback",
+        message: "Gemini separate native provider window opened as fallback only. Provider-owned content remains visible and user-controlled."
       } as T;
     };
 
@@ -246,8 +247,38 @@ describe("tauriClient Sprint 0 contract", () => {
       providerId: "gemini",
       windowLabel: "provider-gemini",
       surfaceMechanism: "native_webview_window",
-      status: "visible"
+      status: "separate_window_fallback"
     });
+  });
+
+  it("requests the in-layout provider container by provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("open_in_layout_provider_container");
+      expect(args).toEqual({ providerId: "claude" });
+      expect(JSON.stringify(args)).not.toContain("https://claude.ai");
+      return {
+        providerId: "claude",
+        displayName: "Claude",
+        origin: "https://claude.ai",
+        windowLabel: "provider-in-layout-claude",
+        surfaceMechanism: "native_child_webview",
+        status: "in_layout",
+        message: "Claude in-layout native provider webview opened inside the main Cyro window."
+      } as T;
+    };
+
+    await expect(openInLayoutProviderContainer("claude", invoker)).resolves.toMatchObject({
+      providerId: "claude",
+      windowLabel: "provider-in-layout-claude",
+      surfaceMechanism: "native_child_webview",
+      status: "in_layout"
+    });
+  });
+
+  it("does not pretend the in-layout native container opens in browser preview", async () => {
+    await expect(openInLayoutProviderContainer("gemini")).rejects.toThrow(
+      "In-layout native provider container requires the Tauri app."
+    );
   });
 
   it("does not pretend the native provider container opens in browser preview", async () => {

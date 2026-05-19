@@ -1145,6 +1145,12 @@ textarea:disabled {
   cursor: pointer;
 }
 
+.provider-native-button.secondary {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(148, 163, 184, 0.08);
+  color: #dbe4e8;
+}
+
 .provider-native-button:disabled {
   cursor: progress;
   opacity: 0.68;

@@ -165,6 +165,14 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
     throw new Error("This provider route is not allowlisted.");
   }
 
+  if (command === "open_in_layout_provider_container") {
+    const providerId = args?.providerId;
+    if (providerId === "chatgpt" || providerId === "claude" || providerId === "gemini") {
+      throw new Error("In-layout native provider container requires the Tauri app. Browser preview cannot open provider webviews.");
+    }
+    throw new Error("This provider route is not allowlisted.");
+  }
+
   throw new Error(`Unknown Sprint 0 command: ${command}`);
 }
 
@@ -271,6 +279,10 @@ export async function getProviderSession(providerId: ProviderId, invoker: TauriI
 
 export async function openNativeProviderContainer(providerId: ProviderId, invoker: TauriInvoker = defaultInvoker) {
   return invoker<ProviderNativeContainerResult>("open_native_provider_container", { providerId });
+}
+
+export async function openInLayoutProviderContainer(providerId: ProviderId, invoker: TauriInvoker = defaultInvoker) {
+  return invoker<ProviderNativeContainerResult>("open_in_layout_provider_container", { providerId });
 }
 
 export function formatRuntimeError(error: unknown, fallback = "The local runtime command failed.") {

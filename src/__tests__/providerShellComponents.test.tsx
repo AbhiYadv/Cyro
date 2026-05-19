@@ -91,7 +91,8 @@ describe("provider shell components", () => {
         provider="chatgpt"
         status="blocked"
         nativeContainerStatus="untested"
-        onOpenNativeContainer={noop}
+        onOpenInLayoutContainer={noop}
+        onOpenSeparateWindowFallback={noop}
       />
     );
 
@@ -99,9 +100,10 @@ describe("provider shell components", () => {
     expect(html).toContain("Iframe display is blocked");
     expect(html).toContain("blank or blocked iframe");
     expect(html).toContain("Iframe embedding remains a feasibility result, not the final provider-shell solution.");
-    expect(html).toContain("CYRO-PROVIDER-010");
-    expect(html).toContain("Tauri-native visible webview/session container");
-    expect(html).toContain("Open native container");
+    expect(html).toContain("CYRO-PROVIDER-011");
+    expect(html).toContain("Tauri-native in-layout webview container");
+    expect(html).toContain("Open in-layout container");
+    expect(html).toContain("Separate window fallback");
     expect(html).toContain("No DOM, cookie, credential, prompt, or response capture.");
     expect(html).toContain("Explicit fallback");
   });
@@ -114,9 +116,33 @@ describe("provider shell components", () => {
       "Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending."
     );
     expect(html).toContain(
-      "CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture."
+      "CYRO-PROVIDER-011 must determine whether a Tauri-native in-layout webview container can host provider-owned content with no DOM, cookie, credential, prompt, or response capture."
     );
     expect(html).not.toContain("Gemini session is ready");
+  });
+
+  it("renders in-layout and separate-window provider container states distinctly", () => {
+    const inLayoutHtml = renderToString(
+      <ProviderBlockedState
+        provider="claude"
+        status="unvalidated"
+        nativeContainerStatus="in_layout"
+        nativeContainerMessage="Claude in-layout native provider webview opened inside the main Cyro window."
+      />
+    );
+    const fallbackHtml = renderToString(
+      <ProviderBlockedState
+        provider="claude"
+        status="unvalidated"
+        nativeContainerStatus="separate_window_fallback"
+        nativeContainerMessage="Claude separate native provider window opened as fallback only."
+      />
+    );
+
+    expect(inLayoutHtml).toContain("In-layout prototype");
+    expect(inLayoutHtml).toContain("inside the main Cyro window");
+    expect(fallbackHtml).toContain("Separate window fallback");
+    expect(fallbackHtml).toContain("fallback only");
   });
 
   it("labels provider header routes as container pending without changing Local", () => {

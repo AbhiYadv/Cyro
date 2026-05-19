@@ -150,6 +150,7 @@ Final provider shell UX target:
 - iframe embedding remains a feasibility result, not the final provider-shell solution; ChatGPT remains blocked/blank and Claude/Gemini remain unvalidated until separately proven
 - CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture before claiming embedded provider hosting works
 - CYRO-PROVIDER-010 currently treats a separate visible Tauri WebviewWindow as an interim research surface. It is opened only from hardcoded provider ids. The macOS native validation run showed logged-out ChatGPT, Claude, and Gemini provider surfaces loading visibly, but it does not prove final in-layout provider UX, account login, persistent sessions, or provider chat.
+- CYRO-PROVIDER-011 tests a Tauri child webview attached to the main Cyro window as the next in-layout provider surface candidate. This is still feasibility research only: manual native validation is pending, provider login/chat/session persistence are not validated, and separate windows remain fallback rather than final UX.
 
 The composer has a route selector for:
 - Local
@@ -180,6 +181,8 @@ External browser fallback is temporary and only used when embedded provider sess
 Future embedded provider sessions must be approved through the Provider Account Bridge ADR, Provider Session Container design, and Provider Session Security contract before implementation. Until then, Cyro must not claim that provider chats continue fully inside Cyro. Provider-owned content must remain visible and user-controlled inside an isolated Cyro provider surface.
 
 CYRO-PROVIDER-010 status: native provider container research is allowed only as a visible, user-controlled feasibility spike. The current spike does not add provider APIs, scraping, DOM reading, JavaScript injection, cookie capture/export, credential storage, prompt automation, response capture, or memory import. Provider routes remain unvalidated for product use until manual native testing records account login, chat usability, cross-platform behavior, and provider-specific blockers.
+
+CYRO-PROVIDER-011 status: in-layout native provider container research is allowed only as a visible, user-controlled child-webview feasibility spike. The prototype preserves provider-id-only frontend requests, Rust-owned origin allowlisting, no DOM/cookie/credential/prompt/response capture, and explicit separate-window fallback. Manual native validation must still prove whether ChatGPT, Claude, and Gemini actually render inside the main Cyro shell.
 
 ### Provider Account Bridge User Stories
 

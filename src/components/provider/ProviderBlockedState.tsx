@@ -8,7 +8,8 @@ type ProviderBlockedStateProps = {
   status: ProviderSurfaceStatus;
   nativeContainerStatus?: ProviderNativeContainerStatus;
   nativeContainerMessage?: string | null;
-  onOpenNativeContainer?: () => void;
+  onOpenInLayoutContainer?: () => void;
+  onOpenSeparateWindowFallback?: () => void;
 };
 
 const fallbackOrigins: Record<Exclude<ProviderRouteId, "local">, string> = {
@@ -22,7 +23,8 @@ export function ProviderBlockedState({
   status,
   nativeContainerStatus = "untested",
   nativeContainerMessage = null,
-  onOpenNativeContainer
+  onOpenInLayoutContainer,
+  onOpenSeparateWindowFallback
 }: ProviderBlockedStateProps) {
   const providerName = providerDisplayName(provider);
 
@@ -40,10 +42,11 @@ export function ProviderBlockedState({
   }
 
   const isBlocked = status === "blocked";
+  const nativeStatusLabel = nativeContainerStatusLabel(nativeContainerStatus);
 
   return (
     <article className={isBlocked ? "provider-blocked-state blocked" : "provider-blocked-state"} aria-live="polite">
-      <div className="provider-blocked-marker">{isBlocked ? "Blocked" : "Unvalidated"}</div>
+      <div className="provider-blocked-marker">{nativeStatusLabel ?? (isBlocked ? "Blocked" : "Unvalidated")}</div>
       <div>
         <p className="eyebrow">{providerRouteStatusText(provider)}</p>
         <h2>Provider shell is not validated yet.</h2>
@@ -55,20 +58,30 @@ export function ProviderBlockedState({
           : `${providerName} is available as a route in the shell prototype, but manual embedded-session validation is still pending.`}
       </p>
       <p>
-        Iframe embedding remains a feasibility result, not the final provider-shell solution. CYRO-PROVIDER-010 must
-        validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response
-        capture.
+        Iframe embedding remains a feasibility result, not the final provider-shell solution. CYRO-PROVIDER-011 must
+        determine whether a Tauri-native in-layout webview container can host provider-owned content with no DOM, cookie,
+        credential, prompt, or response capture.
       </p>
       <p className="provider-native-boundary">No DOM, cookie, credential, prompt, or response capture.</p>
       <div className="provider-container-actions">
-        {onOpenNativeContainer ? (
+        {onOpenInLayoutContainer ? (
           <button
             className="provider-native-button"
             type="button"
-            onClick={onOpenNativeContainer}
+            onClick={onOpenInLayoutContainer}
             disabled={nativeContainerStatus === "opening"}
           >
-            {nativeContainerStatus === "opening" ? "Opening native container" : "Open native container"}
+            {nativeContainerStatus === "opening" ? "Opening in-layout container" : "Open in-layout container"}
+          </button>
+        ) : null}
+        {onOpenSeparateWindowFallback ? (
+          <button
+            className="provider-native-button secondary"
+            type="button"
+            onClick={onOpenSeparateWindowFallback}
+            disabled={nativeContainerStatus === "opening"}
+          >
+            Separate window fallback
           </button>
         ) : null}
         <a className="provider-fallback-link" href={fallbackOrigins[provider]} target="_blank" rel="noreferrer">
@@ -82,4 +95,21 @@ export function ProviderBlockedState({
       ) : null}
     </article>
   );
+}
+
+function nativeContainerStatusLabel(status: ProviderNativeContainerStatus) {
+  switch (status) {
+    case "in_layout":
+      return "In-layout prototype";
+    case "separate_window_fallback":
+      return "Separate window fallback";
+    case "blocked":
+      return "Blocked";
+    case "failed":
+      return "Failed";
+    case "opening":
+      return "Opening";
+    default:
+      return null;
+  }
 }

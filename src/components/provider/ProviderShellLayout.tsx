@@ -7,7 +7,11 @@ import {
   shellComposerPlaceholder
 } from "../../services/providerShell";
 import { isProviderId } from "../../services/providerSession";
-import { formatRuntimeError, openNativeProviderContainer } from "../../services/tauriClient";
+import {
+  formatRuntimeError,
+  openInLayoutProviderContainer,
+  openNativeProviderContainer
+} from "../../services/tauriClient";
 import type { ProviderShellReasoningMode } from "../../services/providerShell";
 import type { ProviderId, ProviderNativeContainerStatus, ProviderRouteId } from "../../types/provider";
 import type { RuntimeStatus } from "../../types/runtime";
@@ -66,7 +70,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     setComposerNotice("Shell generation state cancelled. No provider session was controlled.");
   }
 
-  async function handleOpenNativeContainer(provider: ProviderRouteId) {
+  async function handleOpenInLayoutContainer(provider: ProviderRouteId) {
     if (!isProviderId(provider)) {
       return;
     }
@@ -74,7 +78,35 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     setNativeContainerStatus((current) => ({ ...current, [provider]: "opening" }));
     setNativeContainerMessage((current) => ({
       ...current,
-      [provider]: `${providerDisplayName(provider)} native container opening. Provider page stays visible and user-controlled.`
+      [provider]: `${providerDisplayName(provider)} in-layout native container opening. Provider page stays visible and user-controlled.`
+    }));
+
+    try {
+      const result = await openInLayoutProviderContainer(provider);
+      setNativeContainerStatus((current) => ({ ...current, [provider]: result.status }));
+      setNativeContainerMessage((current) => ({
+        ...current,
+        [provider]:
+          `${result.message} This does not validate provider login, chat, or session persistence; record manual behavior before any success claim.`
+      }));
+    } catch (error) {
+      setNativeContainerStatus((current) => ({ ...current, [provider]: "failed" }));
+      setNativeContainerMessage((current) => ({
+        ...current,
+        [provider]: formatRuntimeError(error, "In-layout native provider container failed to open.")
+      }));
+    }
+  }
+
+  async function handleOpenSeparateWindowFallback(provider: ProviderRouteId) {
+    if (!isProviderId(provider)) {
+      return;
+    }
+
+    setNativeContainerStatus((current) => ({ ...current, [provider]: "opening" }));
+    setNativeContainerMessage((current) => ({
+      ...current,
+      [provider]: `${providerDisplayName(provider)} separate-window fallback opening. This is not final in-layout UX.`
     }));
 
     try {
@@ -83,13 +115,13 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
       setNativeContainerMessage((current) => ({
         ...current,
         [provider]:
-          `${result.message} This does not validate provider login or chat; record manual behavior before any success claim.`
+          `${result.message} Separate-window fallback does not validate final in-layout provider UX, login, chat, or session persistence.`
       }));
     } catch (error) {
       setNativeContainerStatus((current) => ({ ...current, [provider]: "failed" }));
       setNativeContainerMessage((current) => ({
         ...current,
-        [provider]: formatRuntimeError(error, "Native provider container failed to open.")
+        [provider]: formatRuntimeError(error, "Separate-window provider fallback failed to open.")
       }));
     }
   }
@@ -129,7 +161,8 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
               status={shellState.providerSurfaceStatus}
               nativeContainerStatus={nativeContainerStatus[shellState.selectedProvider]}
               nativeContainerMessage={nativeContainerMessage[shellState.selectedProvider]}
-              onOpenNativeContainer={() => handleOpenNativeContainer(shellState.selectedProvider)}
+              onOpenInLayoutContainer={() => handleOpenInLayoutContainer(shellState.selectedProvider)}
+              onOpenSeparateWindowFallback={() => handleOpenSeparateWindowFallback(shellState.selectedProvider)}
             />
           )}
         </section>

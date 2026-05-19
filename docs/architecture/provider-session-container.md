@@ -119,6 +119,34 @@ Manual validation status from `pnpm tauri dev` on 2026-05-19:
 
 Iframe embedding remains unsuitable as the final provider-shell solution unless a provider is separately proven otherwise. CYRO-PROVIDER-010 proves that a separate visible native WebviewWindow can load all three provider origins in logged-out state on this macOS validation run. It does not prove persistent sessions, account login, provider chat, in-layout child webview UX, cross-platform behavior, provider terms compatibility, or provider response import.
 
+## CYRO-PROVIDER-011 In-layout Native Webview Research
+
+CYRO-PROVIDER-011 tests the next surface boundary: a provider-owned native webview attached to the main Cyro window rather than a separate top-level provider window. Tauri v2 exposes child webview support through the `Webview` API and Rust `WebviewBuilder` plus `Window::add_child`, while `WebviewWindow` remains the separate-window mechanism. This spike uses the Rust-owned child webview path so React still requests only `{ providerId }` and never passes an arbitrary URL.
+
+The prototype adds `open_in_layout_provider_container` behind the same provider allowlist:
+- `chatgpt` -> `https://chatgpt.com`
+- `claude` -> `https://claude.ai`
+- `gemini` -> `https://gemini.google.com`
+
+Unknown provider ids and arbitrary URL strings are rejected before any webview is opened. The child webview is visible, attached to the invoking Cyro window, opened in incognito mode for this spike, denies provider popup windows, and limits top-level navigation to the allowlisted provider host. This same-host navigation rule is safer for the spike but may block real login redirects; login/session persistence is still a separate validation task.
+
+Manual validation status on 2026-05-19: code-level validation compiled, but native GUI validation could not be completed in this run because the environment rejected launching `pnpm tauri dev`. Therefore CYRO-PROVIDER-011 does not claim ChatGPT, Claude, or Gemini appeared in-layout inside the main Cyro shell. The manual provider table remains pending:
+
+| Provider | Target mechanism | Manual result | Feasibility finding |
+|---|---|---|---|
+| ChatGPT | Tauri child webview attached to main Cyro window | Not validated in native app during this run. | No in-layout success claim. Must be manually tested in `pnpm tauri dev`. |
+| Claude | Tauri child webview attached to main Cyro window | Not validated in native app during this run. | No in-layout success claim. Must be manually tested in `pnpm tauri dev`. |
+| Gemini | Tauri child webview attached to main Cyro window | Not validated in native app during this run. | No in-layout success claim. Must be manually tested in `pnpm tauri dev`. |
+
+The separate `WebviewWindow` path remains an explicit fallback only. It is not final product UX because the final Provider Account Bridge target is one Cyro chat surface with the composer and provider header remaining in the main shell.
+
+Remaining risks:
+- The child webview API currently requires Tauri's `unstable` feature in this project.
+- Fixed native child bounds must be refined into a responsive lifecycle model before product use.
+- Provider login redirects may require a tighter provider-specific navigation policy; this task does not validate login.
+- Session persistence remains unvalidated because this spike stays incognito and does not inspect provider storage.
+- Cross-platform behavior is unvalidated.
+
 ## Session Isolation Questions
 
 The implementation task must answer these questions before merge:
