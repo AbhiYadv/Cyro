@@ -198,6 +198,9 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
           diagnosticsOpen={shellState.diagnosticsOpen}
           onDrawerToggle={() => dispatch({ type: "toggle_drawer" })}
           onDiagnosticsToggle={() => dispatch({ type: "toggle_diagnostics" })}
+          onOpenSeparateWindow={
+            activeProvider ? () => handleOpenSeparateWindowFallback(activeProvider) : undefined
+          }
         />
 
         <ProviderTabRail
@@ -223,7 +226,11 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
               containerState={activeContainerState}
               nativeContainerMessage={nativeContainerMessage[activeProvider]}
               onOpenInLayoutContainer={() => handleOpenInLayoutContainer(activeProvider)}
-              onOpenSeparateWindowFallback={() => handleOpenSeparateWindowFallback(activeProvider)}
+              onOpenSeparateWindowFallback={
+                activeContainerState === "native_visible"
+                  ? undefined
+                  : () => handleOpenSeparateWindowFallback(activeProvider)
+              }
             />
           ) : null}
         </section>

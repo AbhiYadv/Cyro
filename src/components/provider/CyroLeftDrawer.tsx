@@ -24,7 +24,15 @@ export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps)
             <strong>Cyro</strong>
           </div>
           <button className="ghost-icon-button" type="button" onClick={onToggle} aria-label={open ? "Close navigation drawer" : "Open navigation drawer"}>
-            {open ? "Close" : "Menu"}
+            {open ? (
+              <span className="drawer-close-icon" aria-hidden="true" />
+            ) : (
+              <span className="hamburger-icon" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            )}
           </button>
         </div>
 

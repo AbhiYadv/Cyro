@@ -53,7 +53,6 @@ export function ProviderBlockedState({
 
   return (
     <article className={isBlocked ? "provider-blocked-state blocked" : "provider-blocked-state"} aria-live="polite">
-      <div className="provider-blocked-marker">Provider-owned session</div>
       <div>
         <p className="eyebrow">{providerName}</p>
         <h2>Open {providerName} in Cyro.</h2>

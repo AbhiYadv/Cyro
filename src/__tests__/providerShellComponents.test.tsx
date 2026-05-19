@@ -147,9 +147,10 @@ describe("provider shell components", () => {
     );
 
     expect(inLayoutHtml).toContain("provider-native-canvas");
-    expect(inLayoutHtml).toContain("Provider-owned session — Cyro cannot read this content.");
-    expect(inLayoutHtml).toContain("Native provider webview reserved region");
-    expect(inLayoutHtml).toContain("inside the main Cyro window");
+    expect(inLayoutHtml).toContain("Protected provider session");
+    expect(inLayoutHtml).not.toContain("Provider-owned session — Cyro cannot read this content.");
+    expect(inLayoutHtml).not.toContain("Native provider webview reserved region");
+    expect(inLayoutHtml).not.toContain("inside the main Cyro window");
     expect(inLayoutHtml).not.toContain("cyro-composer-shell");
     expect(inLayoutHtml).not.toContain("composer-send-button");
     expect(inLayoutHtml).not.toContain("Open Claude in Cyro.");
@@ -165,16 +166,16 @@ describe("provider shell components", () => {
       <ProviderNativeCanvas
         provider="chatgpt"
         containerState="native_visible"
-        nativeContainerMessage="ChatGPT native provider webview opened inside the main Cyro window."
       />
     );
 
     expect(html).toContain("provider-native-canvas");
     expect(html).toContain("provider-native-canvas-lock");
     expect(html).toContain("ChatGPT");
-    expect(html).toContain("Provider-owned session — Cyro cannot read this content.");
-    expect(html).toContain("Native provider webview reserved region");
-    expect(html).toContain("native provider webview opened inside the main Cyro window");
+    expect(html).toContain("Protected provider session");
+    expect(html).not.toContain("Provider-owned session — Cyro cannot read this content.");
+    expect(html).not.toContain("Native provider webview reserved region");
+    expect(html).not.toContain("native provider webview opened inside the main Cyro window");
     expect(html).not.toContain("Login and session persistence are not validated.");
     expect(html).not.toContain("Live");
   });
@@ -205,7 +206,8 @@ describe("provider shell components", () => {
     expect(nativeHtml).toContain("provider-native-canvas");
     expect(nativeHtml).not.toContain("cyro-composer-shell");
     expect(nativeHtml).not.toContain("composer-send-button");
-    expect(nativeHtml).toContain("Native provider webview reserved region");
+    expect(nativeHtml).toContain("Protected provider session");
+    expect(nativeHtml).not.toContain("Native provider webview reserved region");
     expect(nativeHtml).not.toContain("Iframe display is blocked.");
     expect(nativeHtml).not.toContain("Open ChatGPT in Cyro.");
     expect(nativeHtml).not.toContain("blank or blocked iframe");
@@ -234,15 +236,19 @@ describe("provider shell components", () => {
     );
 
     expect(geminiHtml).toContain(">Gemini<");
+    expect(geminiHtml).toContain("hamburger-icon");
+    expect(geminiHtml).toContain("aria-label=\"Open navigation drawer\"");
     expect(geminiHtml).not.toContain("route prototype");
     expect(geminiHtml).not.toContain("Live");
+    expect(geminiHtml).not.toContain(">Menu<");
+    expect(geminiHtml).not.toContain(">Diag<");
     expect(geminiHtml).not.toContain("Container pending");
     expect(geminiHtml).not.toContain("Blocked iframe");
-    expect(localHtml).toContain(">Local<");
+    expect(localHtml).toContain(">Cyro<");
     expect(localHtml).not.toContain("Container pending");
   });
 
-  it("labels the provider header as native visible when the child container is attached", () => {
+  it("keeps provider header minimal when the child container is attached", () => {
     const html = renderToString(
       <ProviderHeader
         selectedProvider="chatgpt"
@@ -252,13 +258,17 @@ describe("provider shell components", () => {
         diagnosticsOpen={false}
         onDrawerToggle={noop}
         onDiagnosticsToggle={noop}
+        onOpenSeparateWindow={noop}
       />
     );
 
     expect(html).toContain(">ChatGPT<");
+    expect(html).toContain("aria-label=\"Open in separate window\"");
     expect(html).not.toContain("route prototype");
-    expect(html).toContain("Native visible");
+    expect(html).not.toContain("Native visible");
     expect(html).not.toContain("Blocked iframe");
+    expect(html).not.toContain(">Menu<");
+    expect(html).not.toContain(">Diag<");
     expect(html).not.toContain("Live");
   });
 
@@ -279,8 +289,11 @@ describe("provider shell components", () => {
     expect(openHtml).toContain("Search chats");
     expect(openHtml).toContain("Provider sessions");
     expect(openHtml).not.toContain("Shell only");
+    expect(openHtml).not.toContain(">Menu<");
+    expect(openHtml).not.toContain(">Close<");
     expect(closedHtml).toContain("cyro-left-drawer");
     expect(closedHtml).not.toContain("drawer-scrim");
+    expect(closedHtml).not.toContain(">Menu<");
   });
 
   it("renders Send when Local is idle and Stop while Local generation is active", () => {
@@ -475,20 +488,26 @@ describe("provider shell components", () => {
     expect(html).not.toContain("Opening native provider session");
   });
 
-  it("renders separate window action button on native canvas when handler provided", () => {
+  it("renders separate window as an icon action in the provider header", () => {
     const html = renderToString(
-      <ProviderNativeCanvas
-        provider="chatgpt"
-        containerState="native_visible"
-        onOpenSeparateWindowFallback={noop}
+      <ProviderHeader
+        selectedProvider="chatgpt"
+        generationState="idle"
+        providerSurfaceStatus="blocked"
+        providerContainerState="native_visible"
+        diagnosticsOpen={false}
+        onDrawerToggle={noop}
+        onDiagnosticsToggle={noop}
+        onOpenSeparateWindow={noop}
       />
     );
 
-    expect(html).toContain("Open in separate window");
-    expect(html).toContain("provider-canvas-external-action");
+    expect(html).toContain("provider-open-window-button");
+    expect(html).toContain("aria-label=\"Open in separate window\"");
+    expect(html).not.toContain(">Open in separate window<");
   });
 
-  it("passes separate window action through the native visible container surface", () => {
+  it("does not render pending card or text action for native visible container surface", () => {
     const html = renderToString(
       <ProviderContainerSurface
         provider="chatgpt"
@@ -499,15 +518,19 @@ describe("provider shell components", () => {
     );
 
     expect(html).toContain("provider-native-canvas");
-    expect(html).toContain("Open in separate window");
+    expect(html).toContain("Protected provider session");
+    expect(html).not.toContain("Provider-owned session — Cyro cannot read this content.");
+    expect(html).not.toContain("Open in separate window");
     expect(html).not.toContain("Open ChatGPT in Cyro.");
   });
 
-  it("does not render separate window action on canvas when no handler provided", () => {
+  it("does not render a full provider-owned banner sentence on native canvas", () => {
     const html = renderToString(
       <ProviderNativeCanvas provider="chatgpt" containerState="native_visible" />
     );
 
+    expect(html).toContain("Protected provider session");
+    expect(html).not.toContain("Provider-owned session — Cyro cannot read this content.");
     expect(html).not.toContain("Open in separate window");
     expect(html).not.toContain("provider-canvas-external-action");
   });
@@ -530,6 +553,8 @@ describe("provider shell components", () => {
     expect(html).not.toContain(">Idle<");
     expect(html).not.toContain("route prototype");
     expect(html).not.toContain("Live");
+    expect(html).not.toContain(">Menu<");
+    expect(html).not.toContain(">Diag<");
     expect(html).toContain(">Claude<");
   });
 });

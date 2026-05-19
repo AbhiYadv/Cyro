@@ -25,8 +25,6 @@ export function ProviderContainerSurface({
       <ProviderNativeCanvas
         provider={provider}
         containerState={containerState}
-        nativeContainerMessage={nativeContainerMessage}
-        onOpenSeparateWindowFallback={onOpenSeparateWindowFallback}
       />
     );
   }
