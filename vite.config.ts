@@ -9,13 +9,5 @@ export default defineConfig({
     port: 1420,
     strictPort: true
   },
-  envPrefix: ["VITE_", "TAURI_"],
-  test: {
-    exclude: [
-      "**/node_modules/**",
-      "**/.git/**",
-      "**/.claude/**",
-      "**/.claude/worktrees/**"
-    ]
-  }
+  envPrefix: ["VITE_", "TAURI_"]
 });
