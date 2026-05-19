@@ -8,6 +8,7 @@ import {
   isPromptValid,
   openNativeProviderContainer,
   openInLayoutProviderContainer,
+  resizeInLayoutProviderContainer,
   runRuntimeBenchmark,
   sendLocalPrompt,
   sendLocalPromptStreaming,
@@ -15,6 +16,13 @@ import {
   type TauriInvoker
 } from "../services/tauriClient";
 import type { LocalPromptStreamEvent } from "../types/runtime";
+
+const viewportBounds = {
+  x: 8,
+  y: 76,
+  width: 1360,
+  height: 820
+};
 
 describe("tauriClient Sprint 0 contract", () => {
   it("rejects empty prompts before invoking Tauri", async () => {
@@ -255,7 +263,7 @@ describe("tauriClient Sprint 0 contract", () => {
   it("requests the in-layout provider container by provider id only", async () => {
     const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
       expect(command).toBe("open_in_layout_provider_container");
-      expect(args).toEqual({ providerId: "claude" });
+      expect(args).toEqual({ providerId: "claude", viewportBounds });
       expect(JSON.stringify(args)).not.toContain("https://claude.ai");
       return {
         providerId: "claude",
@@ -268,7 +276,7 @@ describe("tauriClient Sprint 0 contract", () => {
       } as T;
     };
 
-    await expect(openInLayoutProviderContainer("claude", invoker)).resolves.toMatchObject({
+    await expect(openInLayoutProviderContainer("claude", viewportBounds, invoker)).resolves.toMatchObject({
       providerId: "claude",
       windowLabel: "provider-in-layout-claude",
       surfaceMechanism: "native_child_webview",
@@ -277,9 +285,33 @@ describe("tauriClient Sprint 0 contract", () => {
   });
 
   it("does not pretend the in-layout native container opens in browser preview", async () => {
-    await expect(openInLayoutProviderContainer("gemini")).rejects.toThrow(
+    await expect(openInLayoutProviderContainer("gemini", viewportBounds)).rejects.toThrow(
       "In-layout native provider container requires the Tauri app."
     );
+  });
+
+  it("resizes the in-layout provider container with provider id and numeric bounds only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("resize_in_layout_provider_container");
+      expect(args).toEqual({ providerId: "chatgpt", viewportBounds });
+      expect(JSON.stringify(args)).not.toContain("https://chatgpt.com");
+      expect(Object.values((args?.viewportBounds ?? {}) as Record<string, unknown>).every((value) => typeof value === "number")).toBe(true);
+      return {
+        providerId: "chatgpt",
+        displayName: "ChatGPT",
+        origin: "https://chatgpt.com",
+        windowLabel: "provider-in-layout-chatgpt",
+        surfaceMechanism: "native_child_webview",
+        status: "native_visible",
+        message: "ChatGPT in-layout native provider webview bounds updated."
+      } as T;
+    };
+
+    await expect(resizeInLayoutProviderContainer("chatgpt", viewportBounds, invoker)).resolves.toMatchObject({
+      providerId: "chatgpt",
+      windowLabel: "provider-in-layout-chatgpt",
+      status: "native_visible"
+    });
   });
 
   it("requests in-layout provider container close by provider id only", async () => {

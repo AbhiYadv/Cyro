@@ -32,3 +32,10 @@ export type ProviderNativeContainerResult = {
   status: ProviderNativeContainerStatus;
   message: string;
 };
+
+export type ProviderViewportBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};

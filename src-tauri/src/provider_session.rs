@@ -1,6 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{
-    LogicalPosition, LogicalSize, Manager, Rect, Url, WebviewBuilder, WebviewUrl,
+    webview::Color, LogicalPosition, LogicalSize, Manager, Rect, Url, WebviewBuilder, WebviewUrl,
     WebviewWindowBuilder,
 };
 
@@ -32,13 +32,19 @@ pub struct ProviderNativeContainerResult {
     pub message: String,
 }
 
-const PROVIDER_IN_LAYOUT_CANVAS_TOP: f64 = 144.0;
-const PROVIDER_IN_LAYOUT_LABEL_HEIGHT: f64 = 44.0;
-const PROVIDER_IN_LAYOUT_LABEL_GAP: f64 = 8.0;
-const PROVIDER_IN_LAYOUT_BOTTOM_RESERVED: f64 = 236.0;
-const PROVIDER_IN_LAYOUT_DESKTOP_MARGIN: f64 = 40.0;
-const PROVIDER_IN_LAYOUT_MOBILE_MARGIN: f64 = 16.0;
-const PROVIDER_SHELL_MAX_WIDTH: f64 = 1248.0;
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderViewportBounds {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+const PROVIDER_VIEWPORT_MIN_WIDTH: f64 = 320.0;
+const PROVIDER_VIEWPORT_MIN_HEIGHT: f64 = 280.0;
+const PROVIDER_VIEWPORT_MAX_EDGE: f64 = 12_000.0;
+const PROVIDER_WEBVIEW_DARK_BACKGROUND: Color = Color(5, 6, 7, 255);
 
 #[tauri::command]
 pub fn get_provider_session(
@@ -52,9 +58,10 @@ pub async fn open_in_layout_provider_container(
     app: tauri::AppHandle,
     window: tauri::Window,
     provider_id: String,
+    viewport_bounds: ProviderViewportBounds,
 ) -> Result<ProviderNativeContainerResult, RuntimeError> {
     let target = resolve_in_layout_provider_container(&provider_id)?;
-    let bounds = provider_in_layout_bounds(&window)?;
+    let bounds = provider_in_layout_bounds_from_viewport(&window, &provider_id, viewport_bounds)?;
 
     close_other_in_layout_provider_webviews(&app, target.window_label)?;
 
@@ -91,6 +98,7 @@ pub async fn open_in_layout_provider_container(
         target.window_label,
         WebviewUrl::External(provider_url),
     )
+    .background_color(PROVIDER_WEBVIEW_DARK_BACKGROUND)
     .incognito(true)
     .on_navigation(move |url| {
         url.scheme() == "https" && url.host_str() == Some(allowed_host.as_str())
@@ -107,12 +115,49 @@ pub async fn open_in_layout_provider_container(
                 Some(error.to_string()),
             )
         })?;
-    attach_provider_resize_handler(&app, &window, target.window_label);
 
     Ok(target.with_status(
         "native_visible",
         format!(
             "{} in-layout native provider webview opened inside the main Cyro window. This validates placement only, not login, chat, or session persistence.",
+            target.display_name
+        ),
+    ))
+}
+
+#[tauri::command]
+pub async fn resize_in_layout_provider_container(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    provider_id: String,
+    viewport_bounds: ProviderViewportBounds,
+) -> Result<ProviderNativeContainerResult, RuntimeError> {
+    let target = resolve_in_layout_provider_container(&provider_id)?;
+    let bounds = provider_in_layout_bounds_from_viewport(&window, &provider_id, viewport_bounds)?;
+
+    let Some(webview) = app.get_webview(target.window_label) else {
+        return Ok(target.with_status(
+            "native_failed",
+            format!(
+                "{} in-layout native provider webview is not attached yet.",
+                target.display_name
+            ),
+        ));
+    };
+
+    webview.set_bounds(bounds).map_err(|error| {
+        RuntimeError::recoverable(
+            "provider_in_layout_resize_failed",
+            "Cyro could not resize the in-layout provider webview.",
+            "Close and reopen the provider route before continuing provider container validation.",
+            Some(error.to_string()),
+        )
+    })?;
+
+    Ok(target.with_status(
+        "native_visible",
+        format!(
+            "{} in-layout native provider webview bounds updated from the Cyro provider viewport.",
             target.display_name
         ),
     ))
@@ -385,7 +430,12 @@ impl ProviderNativeContainerResult {
     }
 }
 
-fn provider_in_layout_bounds(window: &tauri::Window) -> Result<Rect, RuntimeError> {
+fn provider_in_layout_bounds_from_viewport(
+    window: &tauri::Window,
+    provider_id: &str,
+    viewport_bounds: ProviderViewportBounds,
+) -> Result<Rect, RuntimeError> {
+    let sanitized = validate_provider_viewport_bounds(provider_id, viewport_bounds)?;
     let inner_size = window.inner_size().map_err(|error| {
         RuntimeError::recoverable(
             "provider_window_size_failed",
@@ -403,52 +453,55 @@ fn provider_in_layout_bounds(window: &tauri::Window) -> Result<Rect, RuntimeErro
         )
     })?;
     let logical_size = inner_size.to_logical::<f64>(scale_factor);
-    let shell_width = logical_size.width.min(PROVIDER_SHELL_MAX_WIDTH);
-    let margin = if logical_size.width < 760.0 {
-        PROVIDER_IN_LAYOUT_MOBILE_MARGIN
-    } else {
-        PROVIDER_IN_LAYOUT_DESKTOP_MARGIN
-    };
-    let x = ((logical_size.width - shell_width) / 2.0).max(0.0) + margin;
-    let width = (shell_width - (margin * 2.0)).max(320.0);
-    let y = PROVIDER_IN_LAYOUT_CANVAS_TOP
-        + PROVIDER_IN_LAYOUT_LABEL_HEIGHT
-        + PROVIDER_IN_LAYOUT_LABEL_GAP;
-    let height = (logical_size.height
-        - y
-        - PROVIDER_IN_LAYOUT_BOTTOM_RESERVED)
-        .max(280.0);
+    let max_width = (logical_size.width - sanitized.x).max(PROVIDER_VIEWPORT_MIN_WIDTH);
+    let max_height = (logical_size.height - sanitized.y).max(PROVIDER_VIEWPORT_MIN_HEIGHT);
+    let width = sanitized.width.min(max_width);
+    let height = sanitized.height.min(max_height);
 
     Ok(Rect {
-        position: LogicalPosition::new(x, y).into(),
+        position: LogicalPosition::new(sanitized.x, sanitized.y).into(),
         size: LogicalSize::new(width, height).into(),
     })
 }
 
-fn attach_provider_resize_handler(
-    app: &tauri::AppHandle,
-    window: &tauri::Window,
-    active_label: &'static str,
-) {
-    let app_for_resize = app.clone();
-    let window_for_resize = window.clone();
+fn validate_provider_viewport_bounds(
+    provider_id: &str,
+    bounds: ProviderViewportBounds,
+) -> Result<ProviderViewportBounds, RuntimeError> {
+    resolve_in_layout_provider_container(provider_id)?;
 
-    window.on_window_event(move |event| {
-        if !matches!(
-            event,
-            tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
-        ) {
-            return;
-        }
+    let values = [bounds.x, bounds.y, bounds.width, bounds.height];
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(invalid_provider_bounds_error("provider viewport bounds must be finite numbers"));
+    }
 
-        let Some(webview) = app_for_resize.get_webview(active_label) else {
-            return;
-        };
-        let Ok(bounds) = provider_in_layout_bounds(&window_for_resize) else {
-            return;
-        };
-        let _ = webview.set_bounds(bounds);
-    });
+    if bounds.x < 0.0 || bounds.y < 0.0 {
+        return Err(invalid_provider_bounds_error("provider viewport origin cannot be negative"));
+    }
+
+    if bounds.width < PROVIDER_VIEWPORT_MIN_WIDTH || bounds.height < PROVIDER_VIEWPORT_MIN_HEIGHT {
+        return Err(invalid_provider_bounds_error("provider viewport is too small"));
+    }
+
+    if values.iter().any(|value| *value > PROVIDER_VIEWPORT_MAX_EDGE) {
+        return Err(invalid_provider_bounds_error("provider viewport bounds are unreasonably large"));
+    }
+
+    Ok(ProviderViewportBounds {
+        x: bounds.x.round(),
+        y: bounds.y.round(),
+        width: bounds.width.round(),
+        height: bounds.height.round(),
+    })
+}
+
+fn invalid_provider_bounds_error(detail: &'static str) -> RuntimeError {
+    RuntimeError::recoverable(
+        "provider_in_layout_bounds_invalid",
+        "Cyro rejected invalid provider viewport bounds.",
+        "Reopen the provider route and keep the provider surface visible.",
+        Some(detail.to_string()),
+    )
 }
 
 fn close_other_in_layout_provider_webviews(
@@ -483,7 +536,7 @@ fn close_other_in_layout_provider_webviews(
 mod tests {
     use super::{
         resolve_in_layout_provider_container, resolve_native_provider_container,
-        resolve_provider_session,
+        resolve_provider_session, validate_provider_viewport_bounds, ProviderViewportBounds,
     };
 
     #[test]
@@ -556,5 +609,78 @@ mod tests {
 
         assert_eq!(unknown.code, "provider_not_allowlisted");
         assert_eq!(arbitrary_url.code, "provider_not_allowlisted");
+    }
+
+    #[test]
+    fn resize_bounds_reject_unknown_provider_ids() {
+        let error = validate_provider_viewport_bounds(
+            "perplexity",
+            ProviderViewportBounds {
+                x: 0.0,
+                y: 96.0,
+                width: 1200.0,
+                height: 720.0,
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "provider_not_allowlisted");
+    }
+
+    #[test]
+    fn resize_bounds_reject_invalid_geometry() {
+        for bounds in [
+            ProviderViewportBounds {
+                x: -1.0,
+                y: 96.0,
+                width: 1200.0,
+                height: 720.0,
+            },
+            ProviderViewportBounds {
+                x: 0.0,
+                y: 96.0,
+                width: 0.0,
+                height: 720.0,
+            },
+            ProviderViewportBounds {
+                x: 0.0,
+                y: 96.0,
+                width: 1200.0,
+                height: f64::NAN,
+            },
+            ProviderViewportBounds {
+                x: 0.0,
+                y: 96.0,
+                width: 20_000.0,
+                height: 720.0,
+            },
+        ] {
+            let error = validate_provider_viewport_bounds("chatgpt", bounds).unwrap_err();
+            assert_eq!(error.code, "provider_in_layout_bounds_invalid");
+        }
+    }
+
+    #[test]
+    fn resize_bounds_accept_valid_provider_id_and_numeric_geometry() {
+        let bounds = validate_provider_viewport_bounds(
+            "gemini",
+            ProviderViewportBounds {
+                x: 12.4,
+                y: 74.6,
+                width: 1372.2,
+                height: 822.8,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            bounds,
+            ProviderViewportBounds {
+                x: 12.0,
+                y: 75.0,
+                width: 1372.0,
+                height: 823.0,
+            }
+        );
     }
 }

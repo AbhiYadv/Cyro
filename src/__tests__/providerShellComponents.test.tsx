@@ -461,13 +461,17 @@ describe("provider shell components", () => {
     expect(canvasHtml).not.toContain("login");
   });
 
-  it("renders calm opening state when native container is opening", () => {
+  it("renders dark provider viewport loading state when native container is opening", () => {
     const html = renderToString(
-      <ProviderBlockedState provider="chatgpt" status="blocked" containerState="native_opening" />
+      <ProviderContainerSurface provider="chatgpt" status="blocked" containerState="native_opening" />
     );
 
-    expect(html).toContain("Opening native provider session…");
-    expect(html).toContain("No DOM, cookie, credential, prompt, or response capture.");
+    expect(html).toContain("provider-native-canvas");
+    expect(html).toContain("provider-native-loading");
+    expect(html).toContain("Opening provider session…");
+    expect(html).toContain("Protected provider session");
+    expect(html).not.toContain("Opening native provider session…");
+    expect(html).not.toContain("No DOM, cookie, credential, prompt, or response capture.");
     expect(html).not.toContain("Native provider session pending.");
     expect(html).not.toContain("Open in-layout container");
     expect(html).not.toContain("Retry native session");

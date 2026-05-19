@@ -2,7 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { placeholderModelRegistry } from "./modelRegistry";
 import { mockedSidecarStatus } from "./sidecar";
-import type { ProviderId, ProviderNativeContainerResult, ProviderSessionDescriptor } from "../types/provider";
+import type {
+  ProviderId,
+  ProviderNativeContainerResult,
+  ProviderSessionDescriptor,
+  ProviderViewportBounds
+} from "../types/provider";
 import type {
   CancelGenerationResponse,
   HealthCheck,
@@ -173,6 +178,14 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
     throw new Error("This provider route is not allowlisted.");
   }
 
+  if (command === "resize_in_layout_provider_container") {
+    const providerId = args?.providerId;
+    if (providerId === "chatgpt" || providerId === "claude" || providerId === "gemini") {
+      throw new Error("In-layout native provider container resize requires the Tauri app.");
+    }
+    throw new Error("This provider route is not allowlisted.");
+  }
+
   if (command === "close_in_layout_provider_container") {
     const providerId = args?.providerId;
     if (providerId === "chatgpt" || providerId === "claude" || providerId === "gemini") {
@@ -297,8 +310,20 @@ export async function openNativeProviderContainer(providerId: ProviderId, invoke
   return invoker<ProviderNativeContainerResult>("open_native_provider_container", { providerId });
 }
 
-export async function openInLayoutProviderContainer(providerId: ProviderId, invoker: TauriInvoker = defaultInvoker) {
-  return invoker<ProviderNativeContainerResult>("open_in_layout_provider_container", { providerId });
+export async function openInLayoutProviderContainer(
+  providerId: ProviderId,
+  viewportBounds: ProviderViewportBounds,
+  invoker: TauriInvoker = defaultInvoker
+) {
+  return invoker<ProviderNativeContainerResult>("open_in_layout_provider_container", { providerId, viewportBounds });
+}
+
+export async function resizeInLayoutProviderContainer(
+  providerId: ProviderId,
+  viewportBounds: ProviderViewportBounds,
+  invoker: TauriInvoker = defaultInvoker
+) {
+  return invoker<ProviderNativeContainerResult>("resize_in_layout_provider_container", { providerId, viewportBounds });
 }
 
 export async function closeInLayoutProviderContainer(providerId: ProviderId, invoker: TauriInvoker = defaultInvoker) {

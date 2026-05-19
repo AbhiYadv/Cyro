@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import type { ProviderContainerState, ProviderRouteId } from "../../types/provider";
 import type { ProviderSurfaceStatus } from "../../services/providerShell";
 import { ProviderBlockedState } from "./ProviderBlockedState";
@@ -8,6 +9,7 @@ type ProviderContainerSurfaceProps = {
   status: ProviderSurfaceStatus;
   containerState: ProviderContainerState;
   nativeContainerMessage?: string | null;
+  viewportRef?: Ref<HTMLDivElement>;
   onOpenInLayoutContainer?: () => void;
   onOpenSeparateWindowFallback?: () => void;
 };
@@ -17,14 +19,17 @@ export function ProviderContainerSurface({
   status,
   containerState,
   nativeContainerMessage,
+  viewportRef,
   onOpenInLayoutContainer,
   onOpenSeparateWindowFallback
 }: ProviderContainerSurfaceProps) {
-  if (containerState === "native_visible") {
+  if (containerState === "native_visible" || containerState === "native_opening") {
     return (
       <ProviderNativeCanvas
         provider={provider}
         containerState={containerState}
+        loading={containerState === "native_opening"}
+        viewportRef={viewportRef}
       />
     );
   }

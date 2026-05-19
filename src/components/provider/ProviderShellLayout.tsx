@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useReducer, useState } from "react";
+import { FormEvent, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { RuntimePanel } from "../runtime/RuntimePanel";
 import {
   defaultProviderShellState,
@@ -12,14 +12,16 @@ import {
   closeInLayoutProviderContainer,
   formatRuntimeError,
   openInLayoutProviderContainer,
-  openNativeProviderContainer
+  openNativeProviderContainer,
+  resizeInLayoutProviderContainer
 } from "../../services/tauriClient";
 import type { ProviderShellReasoningMode } from "../../services/providerShell";
 import type {
   ProviderContainerState,
   ProviderId,
   ProviderNativeContainerStatus,
-  ProviderRouteId
+  ProviderRouteId,
+  ProviderViewportBounds
 } from "../../types/provider";
 import type { RuntimeStatus } from "../../types/runtime";
 import { CyroComposer } from "./CyroComposer";
@@ -36,6 +38,7 @@ type ProviderShellLayoutProps = {
 
 export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: ProviderShellLayoutProps) {
   const [shellState, dispatch] = useReducer(providerShellReducer, defaultProviderShellState);
+  const providerViewportRef = useRef<HTMLDivElement | null>(null);
   const [prompt, setPrompt] = useState("");
   const [composerNotice, setComposerNotice] = useState<string | null>(null);
   const [nativeContainerStatus, setNativeContainerStatus] = useState<Record<ProviderId, ProviderContainerState>>({
@@ -48,6 +51,10 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     claude: null,
     gemini: null
   });
+  const activeProvider = isProviderId(shellState.selectedProvider) ? shellState.selectedProvider : null;
+  const activeContainerState = activeProvider
+    ? nativeContainerStatus[activeProvider]
+    : "idle";
 
   // Auto-open in-layout container when user selects a provider tab.
   // nativeContainerStatus and handleOpenInLayoutContainer intentionally omitted — we only want this to fire on tab change.
@@ -59,6 +66,86 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shellState.selectedProvider]);
+
+  const readProviderViewportBounds = useCallback((): ProviderViewportBounds | null => {
+    const viewport = providerViewportRef.current;
+    if (!viewport) {
+      return null;
+    }
+
+    const rect = viewport.getBoundingClientRect();
+    const bounds = {
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: rect.height
+    };
+
+    const values = Object.values(bounds);
+    if (values.some((value) => !Number.isFinite(value)) || bounds.width < 320 || bounds.height < 280) {
+      return null;
+    }
+
+    return {
+      x: Math.round(bounds.x),
+      y: Math.round(bounds.y),
+      width: Math.round(bounds.width),
+      height: Math.round(bounds.height)
+    };
+  }, []);
+
+  const readProviderViewportBoundsAfterPaint = useCallback(async () => {
+    await waitForNextFrame();
+    await waitForNextFrame();
+    return readProviderViewportBounds();
+  }, [readProviderViewportBounds]);
+
+  const syncProviderViewportBounds = useCallback(
+    async (provider: ProviderId) => {
+      const viewportBounds = readProviderViewportBounds();
+      if (!viewportBounds) {
+        return;
+      }
+
+      try {
+        await resizeInLayoutProviderContainer(provider, viewportBounds);
+      } catch (error) {
+        setNativeContainerStatus((current) => ({ ...current, [provider]: "native_failed" }));
+        setNativeContainerMessage((current) => ({
+          ...current,
+          [provider]: formatRuntimeError(error, "In-layout native provider container failed to resize.")
+        }));
+      }
+    },
+    [readProviderViewportBounds]
+  );
+
+  useEffect(() => {
+    if (!activeProvider || activeContainerState !== "native_visible") {
+      return;
+    }
+
+    let cancelled = false;
+    const sync = () => {
+      if (!cancelled) {
+        void syncProviderViewportBounds(activeProvider);
+      }
+    };
+
+    void waitForNextFrame().then(sync);
+    window.addEventListener("resize", sync);
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" && providerViewportRef.current
+        ? new ResizeObserver(sync)
+        : null;
+    resizeObserver?.observe(providerViewportRef.current as Element);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("resize", sync);
+      resizeObserver?.disconnect();
+    };
+  }, [activeProvider, activeContainerState, syncProviderViewportBounds]);
 
   async function handleProviderChange(provider: ProviderRouteId) {
     const previousProvider = shellState.selectedProvider;
@@ -123,7 +210,12 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     }));
 
     try {
-      const result = await openInLayoutProviderContainer(provider);
+      const viewportBounds = await readProviderViewportBoundsAfterPaint();
+      if (!viewportBounds) {
+        throw new Error("Provider viewport geometry was not available.");
+      }
+
+      const result = await openInLayoutProviderContainer(provider, viewportBounds);
       setNativeContainerStatus((current) => ({ ...current, [provider]: providerContainerStateFromNativeStatus(result.status) }));
       setNativeContainerMessage((current) => ({
         ...current,
@@ -167,16 +259,12 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     }
   }
 
-  const activeProvider = isProviderId(shellState.selectedProvider) ? shellState.selectedProvider : null;
-  const activeContainerState = activeProvider
-    ? nativeContainerStatus[activeProvider]
-    : "idle";
   const isLocalRoute = shellState.selectedProvider === "local";
   const mainClassName = isLocalRoute ? "provider-shell-main local-mode" : "provider-shell-main provider-mode";
   const stageClassName = [
     "provider-chat-stage",
     isLocalRoute ? "local-stage" : "provider-stage",
-    activeContainerState === "native_visible" ? "native-canvas-active" : null
+    activeContainerState === "native_visible" || activeContainerState === "native_opening" ? "native-canvas-active" : null
   ]
     .filter(Boolean)
     .join(" ");
@@ -225,6 +313,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
               status={shellState.providerSurfaceStatus}
               containerState={activeContainerState}
               nativeContainerMessage={nativeContainerMessage[activeProvider]}
+              viewportRef={providerViewportRef}
               onOpenInLayoutContainer={() => handleOpenInLayoutContainer(activeProvider)}
               onOpenSeparateWindowFallback={
                 activeContainerState === "native_visible"
@@ -296,4 +385,15 @@ function providerContainerStateFromNativeStatus(status: ProviderNativeContainerS
 
 function defaultContainerStateForProvider(provider: ProviderId): ProviderContainerState {
   return provider === "chatgpt" ? "iframe_blocked" : "idle";
+}
+
+function waitForNextFrame() {
+  return new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => resolve());
+      return;
+    }
+
+    setTimeout(resolve, 0);
+  });
 }
