@@ -984,4 +984,28 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn resize_bounds_accept_fullscreen_sized_geometry() {
+        let bounds = validate_provider_viewport_bounds(
+            "chatgpt",
+            ProviderViewportBounds {
+                x: 72.0,
+                y: 64.0,
+                width: 3840.0,
+                height: 2160.0,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            bounds,
+            ProviderViewportBounds {
+                x: 72.0,
+                y: 64.0,
+                width: 3840.0,
+                height: 2160.0,
+            }
+        );
+    }
 }

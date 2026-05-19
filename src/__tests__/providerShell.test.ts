@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   defaultProviderShellState,
   generationControlForState,
+  normalizeProviderViewportBounds,
   providerShellReducer,
   providerSurfaceStatusForRoute,
   runtimeDiagnosticsMode,
   shellComposerPlaceholder,
   shellTools,
-  shouldAutoOpenProvider
+  shouldAutoOpenProvider,
+  shouldSyncProviderViewportBounds
 } from "../services/providerShell";
 
 describe("provider shell state contract", () => {
@@ -150,5 +152,46 @@ describe("provider shell state contract", () => {
     expect(shouldAutoOpenProvider("chatgpt", "native_hidden")).toBe(true);
     expect(shouldAutoOpenProvider("chatgpt", "separate_window_fallback")).toBe(false);
     expect(shouldAutoOpenProvider("chatgpt", "native_failed")).toBe(true);
+  });
+
+  it("syncs measured provider bounds only for native-visible provider routes", () => {
+    const fullscreenBounds = {
+      x: 62.4,
+      y: 86.5,
+      width: 3012.2,
+      height: 1818.8
+    };
+
+    expect(normalizeProviderViewportBounds(fullscreenBounds)).toEqual({
+      x: 62,
+      y: 87,
+      width: 3012,
+      height: 1819
+    });
+    expect(shouldSyncProviderViewportBounds("chatgpt", "native_visible", fullscreenBounds)).toBe(true);
+    expect(shouldSyncProviderViewportBounds("gemini", "native_visible", fullscreenBounds)).toBe(true);
+    expect(shouldSyncProviderViewportBounds("local", "native_visible", fullscreenBounds)).toBe(false);
+  });
+
+  it("does not approve stale or invalid provider bounds for resize sync", () => {
+    expect(shouldSyncProviderViewportBounds("chatgpt", "native_opening", {
+      x: 0,
+      y: 84,
+      width: 1400,
+      height: 900
+    })).toBe(false);
+    expect(shouldSyncProviderViewportBounds("chatgpt", "native_visible", {
+      x: 0,
+      y: 84,
+      width: 280,
+      height: 900
+    })).toBe(false);
+    expect(shouldSyncProviderViewportBounds("claude", "native_visible", {
+      x: 0,
+      y: 84,
+      width: Number.NaN,
+      height: 900
+    })).toBe(false);
+    expect(normalizeProviderViewportBounds(null)).toBeNull();
   });
 });

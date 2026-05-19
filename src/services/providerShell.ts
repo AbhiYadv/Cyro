@@ -1,4 +1,4 @@
-import type { ProviderContainerState, ProviderRouteId } from "../types/provider";
+import type { ProviderContainerState, ProviderRouteId, ProviderViewportBounds } from "../types/provider";
 
 export type ProviderShellReasoningMode = "fast" | "think" | "pro";
 export type ProviderShellGenerationState = "idle" | "starting" | "streaming" | "cancelling" | "cancelled" | "completed" | "failed";
@@ -80,6 +80,44 @@ export function shouldAutoOpenProvider(provider: ProviderRouteId, containerState
   if (provider === "local") return false;
   if (containerState === "native_opening" || containerState === "native_visible" || containerState === "separate_window_fallback") return false;
   return true;
+}
+
+export function normalizeProviderViewportBounds(bounds: ProviderViewportBounds | null | undefined): ProviderViewportBounds | null {
+  if (!bounds) {
+    return null;
+  }
+
+  const values = [bounds.x, bounds.y, bounds.width, bounds.height];
+  const hasInvalidNumber = values.some((value) => !Number.isFinite(value));
+  if (
+    hasInvalidNumber ||
+    bounds.x < 0 ||
+    bounds.y < 0 ||
+    bounds.width < 320 ||
+    bounds.height < 280 ||
+    values.some((value) => value > 12_000)
+  ) {
+    return null;
+  }
+
+  return {
+    x: Math.round(bounds.x),
+    y: Math.round(bounds.y),
+    width: Math.round(bounds.width),
+    height: Math.round(bounds.height)
+  };
+}
+
+export function shouldSyncProviderViewportBounds(
+  provider: ProviderRouteId | null,
+  containerState: ProviderContainerState | undefined,
+  bounds: ProviderViewportBounds | null | undefined
+): boolean {
+  if (!provider || provider === "local" || containerState !== "native_visible") {
+    return false;
+  }
+
+  return normalizeProviderViewportBounds(bounds) !== null;
 }
 
 export function providerShellStatusLabel(status: ProviderSurfaceStatus) {

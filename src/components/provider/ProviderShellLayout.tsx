@@ -2,10 +2,12 @@ import { FormEvent, useCallback, useEffect, useReducer, useRef, useState } from 
 import { RuntimePanel } from "../runtime/RuntimePanel";
 import {
   defaultProviderShellState,
+  normalizeProviderViewportBounds,
   providerDisplayName,
   providerShellReducer,
   shellComposerPlaceholder,
-  shouldAutoOpenProvider
+  shouldAutoOpenProvider,
+  shouldSyncProviderViewportBounds
 } from "../../services/providerShell";
 import { isProviderId } from "../../services/providerSession";
 import {
@@ -117,17 +119,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
       height: rect.height
     };
 
-    const values = Object.values(bounds);
-    if (values.some((value) => !Number.isFinite(value)) || bounds.width < 320 || bounds.height < 280) {
-      return null;
-    }
-
-    return {
-      x: Math.round(bounds.x),
-      y: Math.round(bounds.y),
-      width: Math.round(bounds.width),
-      height: Math.round(bounds.height)
-    };
+    return normalizeProviderViewportBounds(bounds);
   }, []);
 
   const readProviderViewportBoundsAfterPaint = useCallback(async () => {
@@ -137,9 +129,9 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
   }, [readProviderViewportBounds]);
 
   const syncProviderViewportBounds = useCallback(
-    async (provider: ProviderId) => {
+    async (provider: ProviderId, containerState: ProviderContainerState = nativeContainerStatus[provider]) => {
       const viewportBounds = readProviderViewportBounds();
-      if (!viewportBounds) {
+      if (!viewportBounds || !shouldSyncProviderViewportBounds(provider, containerState, viewportBounds)) {
         return;
       }
 
@@ -153,7 +145,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
         }));
       }
     },
-    [readProviderViewportBounds]
+    [nativeContainerStatus, readProviderViewportBounds]
   );
 
   useEffect(() => {
@@ -162,26 +154,75 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     }
 
     let cancelled = false;
-    const sync = () => {
-      if (!cancelled) {
-        void syncProviderViewportBounds(activeProvider);
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const frameIds: number[] = [];
+
+    const clearScheduledSync = () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      while (frameIds.length > 0) {
+        const frameId = frameIds.pop();
+        if (typeof frameId === "number" && typeof cancelAnimationFrame === "function") {
+          cancelAnimationFrame(frameId);
+        }
       }
     };
 
-    void waitForNextFrame().then(sync);
-    window.addEventListener("resize", sync);
+    const requestFrame = (callback: () => void) => {
+      if (typeof requestAnimationFrame === "function") {
+        const frameId = requestAnimationFrame(callback);
+        frameIds.push(frameId);
+        return;
+      }
+
+      timeoutId = setTimeout(callback, 0);
+    };
+
+    const scheduleSync = () => {
+      if (cancelled) {
+        return;
+      }
+
+      clearScheduledSync();
+      const provider = activeProvider;
+      const maskStartedAt = beginProviderLoadingMask(provider);
+
+      timeoutId = setTimeout(() => {
+        timeoutId = null;
+        requestFrame(() => {
+          requestFrame(() => {
+            if (cancelled) {
+              return;
+            }
+
+            void syncProviderViewportBounds(provider).finally(() => {
+              if (!cancelled) {
+                void settleProviderLoadingMask(provider, maskStartedAt);
+              }
+            });
+          });
+        });
+      }, 90);
+    };
+
+    scheduleSync();
+    window.addEventListener("resize", scheduleSync);
     const resizeObserver =
       typeof ResizeObserver !== "undefined" && providerViewportRef.current
-        ? new ResizeObserver(sync)
+        ? new ResizeObserver(scheduleSync)
         : null;
     resizeObserver?.observe(providerViewportRef.current as Element);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("resize", sync);
+      clearScheduledSync();
+      window.removeEventListener("resize", scheduleSync);
       resizeObserver?.disconnect();
     };
-  }, [activeProvider, activeContainerState, syncProviderViewportBounds]);
+  }, [activeProvider, activeContainerState, beginProviderLoadingMask, settleProviderLoadingMask, syncProviderViewportBounds]);
 
   useEffect(() => {
     if (!activeProvider || activeContainerState !== "native_visible" || !shellState.drawerOpen) {
@@ -363,7 +404,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
         ...current,
         [provider]: `${result.message} Cyro did not read provider DOM, cookies, prompts, or responses.`
       }));
-      void syncProviderViewportBounds(provider);
+      void syncProviderViewportBounds(provider, "native_visible");
     } catch (error) {
       await settleProviderLoadingMask(provider, maskStartedAt);
       setNativeContainerStatus((current) => ({ ...current, [provider]: "native_failed" }));
@@ -394,7 +435,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
         ...current,
         [provider]: `${result.message} Cyro accepted only providerId; provider home stayed Rust-allowlisted.`
       }));
-      void syncProviderViewportBounds(provider);
+      void syncProviderViewportBounds(provider, "native_visible");
     } catch (error) {
       await settleProviderLoadingMask(provider, maskStartedAt);
       setNativeContainerStatus((current) => ({ ...current, [provider]: "native_failed" }));
