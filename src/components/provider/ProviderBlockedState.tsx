@@ -8,7 +8,6 @@ type ProviderBlockedStateProps = {
   containerState?: ProviderContainerState;
   nativeContainerMessage?: string | null;
   onOpenInLayoutContainer?: () => void;
-  onOpenSeparateWindowFallback?: () => void;
 };
 
 export function ProviderBlockedState({
@@ -16,8 +15,7 @@ export function ProviderBlockedState({
   status,
   containerState = "idle",
   nativeContainerMessage = null,
-  onOpenInLayoutContainer,
-  onOpenSeparateWindowFallback
+  onOpenInLayoutContainer
 }: ProviderBlockedStateProps) {
   const providerName = providerDisplayName(provider);
 
@@ -69,11 +67,6 @@ export function ProviderBlockedState({
         {onOpenInLayoutContainer ? (
           <button className="provider-native-button" type="button" onClick={onOpenInLayoutContainer}>
             {containerState === "native_failed" ? "Retry in Cyro" : "Open in Cyro"}
-          </button>
-        ) : null}
-        {onOpenSeparateWindowFallback ? (
-          <button className="provider-native-button secondary" type="button" onClick={onOpenSeparateWindowFallback}>
-            Open separate window
           </button>
         ) : null}
       </div>

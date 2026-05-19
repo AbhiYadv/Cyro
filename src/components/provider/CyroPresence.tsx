@@ -18,14 +18,13 @@ export function CyroPresence({ provider, status, generationState }: CyroPresence
   const stateClass = isActiveGeneration(generationState) ? "active" : status;
 
   return (
-    <div className={`cyro-presence ${provider} ${stateClass}`} aria-label="Cyro Presence" role="img">
-      <div className="cyro-presence-ring" aria-hidden="true">
-        <span className="cyro-presence-node one" />
-        <span className="cyro-presence-node two" />
-        <span className="cyro-presence-node three" />
-      </div>
-      <div className="cyro-presence-core" aria-hidden="true">
-        <span className="cyro-presence-glint" />
+    <div className={`cyro-star-presence ${provider} ${stateClass}`} aria-label="Cyro star presence" role="img">
+      <div className="cyro-star-glow" aria-hidden="true" />
+      <span className="cyro-star-wave" aria-hidden="true" />
+      <div className="cyro-star-body" aria-hidden="true">
+        <span className="cyro-star-eye left" />
+        <span className="cyro-star-eye right" />
+        <span className="cyro-star-smile" />
       </div>
     </div>
   );

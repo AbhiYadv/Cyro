@@ -11,7 +11,9 @@ type ProviderContainerSurfaceProps = {
   nativeContainerMessage?: string | null;
   viewportRef?: Ref<HTMLDivElement>;
   onOpenInLayoutContainer?: () => void;
-  onOpenSeparateWindowFallback?: () => void;
+  onGoHome?: () => void;
+  onReload?: () => void;
+  loadingMaskActive?: boolean;
 };
 
 export function ProviderContainerSurface({
@@ -21,15 +23,19 @@ export function ProviderContainerSurface({
   nativeContainerMessage,
   viewportRef,
   onOpenInLayoutContainer,
-  onOpenSeparateWindowFallback
+  onGoHome,
+  onReload,
+  loadingMaskActive = false
 }: ProviderContainerSurfaceProps) {
-  if (containerState === "native_visible" || containerState === "native_opening") {
+  if (loadingMaskActive || containerState === "native_visible" || containerState === "native_opening") {
     return (
       <ProviderNativeCanvas
         provider={provider}
         containerState={containerState}
-        loading={containerState === "native_opening"}
+        loading={loadingMaskActive || containerState === "native_opening"}
         viewportRef={viewportRef}
+        onGoHome={onGoHome}
+        onReload={onReload}
       />
     );
   }
@@ -41,7 +47,6 @@ export function ProviderContainerSurface({
       containerState={containerState}
       nativeContainerMessage={nativeContainerMessage}
       onOpenInLayoutContainer={onOpenInLayoutContainer}
-      onOpenSeparateWindowFallback={onOpenSeparateWindowFallback}
     />
   );
 }

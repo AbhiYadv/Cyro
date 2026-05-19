@@ -249,6 +249,93 @@ pub async fn hide_in_layout_provider_container(
 }
 
 #[tauri::command]
+pub async fn provider_reload(
+    app: tauri::AppHandle,
+    provider_id: String,
+) -> Result<ProviderNativeContainerResult, RuntimeError> {
+    let target = resolve_in_layout_provider_container(&provider_id)?;
+
+    let Some(webview) = app.get_webview(target.window_label) else {
+        return Ok(target.with_status(
+            "native_failed",
+            format!(
+                "{} in-layout native provider webview is not attached yet.",
+                target.display_name
+            ),
+        ));
+    };
+
+    webview.hide().map_err(|error| {
+        RuntimeError::recoverable(
+            "provider_reload_hide_failed",
+            "Cyro could not mask the provider webview before reload.",
+            "Use Provider Home or reopen the provider route.",
+            Some(error.to_string()),
+        )
+    })?;
+    webview.reload().map_err(|error| {
+        RuntimeError::recoverable(
+            "provider_reload_failed",
+            "Cyro could not reload the provider webview.",
+            "Use Provider Home or reopen the provider route.",
+            Some(error.to_string()),
+        )
+    })?;
+
+    Ok(target.with_status(
+        "native_opening",
+        format!(
+            "{} provider session reload requested. Provider-owned content remains unread by Cyro.",
+            target.display_name
+        ),
+    ))
+}
+
+#[tauri::command]
+pub async fn provider_go_home(
+    app: tauri::AppHandle,
+    provider_id: String,
+) -> Result<ProviderNativeContainerResult, RuntimeError> {
+    let target = resolve_in_layout_provider_container(&provider_id)?;
+    let provider_url = provider_home_url(&provider_id)?;
+
+    let Some(webview) = app.get_webview(target.window_label) else {
+        return Ok(target.with_status(
+            "native_failed",
+            format!(
+                "{} in-layout native provider webview is not attached yet.",
+                target.display_name
+            ),
+        ));
+    };
+
+    webview.hide().map_err(|error| {
+        RuntimeError::recoverable(
+            "provider_home_hide_failed",
+            "Cyro could not mask the provider webview before navigating home.",
+            "Reload or reopen the provider route.",
+            Some(error.to_string()),
+        )
+    })?;
+    webview.navigate(provider_url).map_err(|error| {
+        RuntimeError::recoverable(
+            "provider_home_failed",
+            "Cyro could not navigate the provider webview to its allowlisted home.",
+            "Reload or reopen the provider route.",
+            Some(error.to_string()),
+        )
+    })?;
+
+    Ok(target.with_status(
+        "native_opening",
+        format!(
+            "{} provider home requested from the Rust-owned allowlist. No frontend URL was accepted.",
+            target.display_name
+        ),
+    ))
+}
+
+#[tauri::command]
 pub async fn close_in_layout_provider_container(
     app: tauri::AppHandle,
     provider_id: String,
@@ -376,6 +463,18 @@ pub fn provider_webview_session_policy(
     Ok(ProviderWebviewSessionPolicy {
         incognito: false,
         data_store_identifier,
+    })
+}
+
+pub fn provider_home_url(provider_id: &str) -> Result<Url, RuntimeError> {
+    let target = resolve_in_layout_provider_container(provider_id)?;
+    Url::parse(target.origin).map_err(|error| {
+        RuntimeError::recoverable(
+            "provider_origin_parse_failed",
+            "Cyro could not parse the allowlisted provider origin.",
+            "Use reload or reopen the provider route.",
+            Some(error.to_string()),
+        )
     })
 }
 
@@ -677,6 +776,7 @@ fn invalid_provider_bounds_error(detail: &'static str) -> RuntimeError {
 mod tests {
     use super::{
         is_provider_navigation_allowed, provider_webview_session_policy,
+        provider_home_url,
         resolve_in_layout_provider_container, resolve_native_provider_container,
         resolve_provider_session, validate_provider_viewport_bounds, ProviderViewportBounds,
     };
@@ -750,6 +850,26 @@ mod tests {
         let unknown = resolve_in_layout_provider_container("perplexity").unwrap_err();
         let arbitrary_url =
             resolve_in_layout_provider_container("https://chatgpt.com").unwrap_err();
+
+        assert_eq!(unknown.code, "provider_not_allowlisted");
+        assert_eq!(arbitrary_url.code, "provider_not_allowlisted");
+    }
+
+    #[test]
+    fn provider_home_uses_allowlisted_provider_origin() {
+        let chatgpt = provider_home_url("chatgpt").unwrap();
+        let claude = provider_home_url("claude").unwrap();
+        let gemini = provider_home_url("gemini").unwrap();
+
+        assert_eq!(chatgpt.as_str(), "https://chatgpt.com/");
+        assert_eq!(claude.as_str(), "https://claude.ai/");
+        assert_eq!(gemini.as_str(), "https://gemini.google.com/");
+    }
+
+    #[test]
+    fn provider_navigation_controls_reject_unknown_provider_ids() {
+        let unknown = provider_home_url("perplexity").unwrap_err();
+        let arbitrary_url = provider_home_url("https://chatgpt.com").unwrap_err();
 
         assert_eq!(unknown.code, "provider_not_allowlisted");
         assert_eq!(arbitrary_url.code, "provider_not_allowlisted");

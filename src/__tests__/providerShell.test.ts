@@ -82,6 +82,43 @@ describe("provider shell state contract", () => {
     expect(closed.drawerOpen).toBe(false);
   });
 
+  it("keeps Gemini selected when the menu is toggled", () => {
+    const gemini = providerShellReducer(defaultProviderShellState, {
+      type: "select_provider",
+      provider: "gemini"
+    });
+    const menuOpen = providerShellReducer(gemini, { type: "toggle_drawer" });
+    const menuClosed = providerShellReducer(menuOpen, { type: "toggle_drawer" });
+
+    expect(menuOpen.selectedProvider).toBe("gemini");
+    expect(menuOpen.providerSurfaceStatus).toBe("unvalidated");
+    expect(menuClosed.selectedProvider).toBe("gemini");
+  });
+
+  it("keeps Claude selected when the menu is toggled", () => {
+    const claude = providerShellReducer(defaultProviderShellState, {
+      type: "select_provider",
+      provider: "claude"
+    });
+    const menuOpen = providerShellReducer(claude, { type: "toggle_drawer" });
+
+    expect(menuOpen.selectedProvider).toBe("claude");
+    expect(menuOpen.providerSurfaceStatus).toBe("unvalidated");
+  });
+
+  it("keeps the selected provider when the drawer is closed", () => {
+    const gemini = providerShellReducer(defaultProviderShellState, {
+      type: "select_provider",
+      provider: "gemini"
+    });
+    const menuOpen = providerShellReducer(gemini, { type: "toggle_drawer" });
+    const closed = providerShellReducer(menuOpen, { type: "close_drawer" });
+
+    expect(closed.drawerOpen).toBe(false);
+    expect(closed.selectedProvider).toBe("gemini");
+    expect(closed.providerSurfaceStatus).toBe("unvalidated");
+  });
+
   it("renders ChatGPT as blocked because iframe feasibility failed", () => {
     expect(providerSurfaceStatusForRoute("chatgpt")).toBe("blocked");
   });

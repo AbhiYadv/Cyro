@@ -491,6 +491,8 @@ pub fn run() {
             provider_session::close_in_layout_provider_container,
             provider_session::hide_in_layout_provider_container,
             provider_session::open_in_layout_provider_container,
+            provider_session::provider_go_home,
+            provider_session::provider_reload,
             provider_session::resize_in_layout_provider_container,
             provider_session::open_native_provider_container,
             send_local_prompt,

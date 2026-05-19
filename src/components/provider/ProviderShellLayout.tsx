@@ -13,6 +13,8 @@ import {
   hideInLayoutProviderContainer,
   openInLayoutProviderContainer,
   openNativeProviderContainer,
+  providerGoHome,
+  providerReload,
   resizeInLayoutProviderContainer
 } from "../../services/tauriClient";
 import type { ProviderShellReasoningMode } from "../../services/providerShell";
@@ -30,6 +32,8 @@ import { CyroPresence } from "./CyroPresence";
 import { ProviderContainerSurface } from "./ProviderContainerSurface";
 import { ProviderHeader } from "./ProviderHeader";
 import { ProviderTabRail } from "./ProviderTabRail";
+
+const PROVIDER_LOADING_MASK_MIN_MS = 950;
 
 type ProviderShellLayoutProps = {
   runtimeStatus: RuntimeStatus;
@@ -51,10 +55,42 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     claude: null,
     gemini: null
   });
+  const [providerLoadingMask, setProviderLoadingMask] = useState<Record<ProviderId, boolean>>({
+    chatgpt: false,
+    claude: false,
+    gemini: false
+  });
+  const providerLoadingMaskStartedAtRef = useRef<Record<ProviderId, number>>({
+    chatgpt: 0,
+    claude: 0,
+    gemini: 0
+  });
   const activeProvider = isProviderId(shellState.selectedProvider) ? shellState.selectedProvider : null;
   const activeContainerState = activeProvider
     ? nativeContainerStatus[activeProvider]
     : "idle";
+  const activeProviderLoadingMask = activeProvider ? providerLoadingMask[activeProvider] : false;
+
+  const beginProviderLoadingMask = useCallback((provider: ProviderId) => {
+    const startedAt = Date.now();
+    providerLoadingMaskStartedAtRef.current[provider] = startedAt;
+    setProviderLoadingMask((current) => ({ ...current, [provider]: true }));
+    return startedAt;
+  }, []);
+
+  const settleProviderLoadingMask = useCallback(async (provider: ProviderId, startedAt: number) => {
+    const elapsedMs = Date.now() - startedAt;
+    const remainingMs = Math.max(PROVIDER_LOADING_MASK_MIN_MS - elapsedMs, 0);
+    if (remainingMs > 0) {
+      await waitForMs(remainingMs);
+    }
+
+    if (providerLoadingMaskStartedAtRef.current[provider] !== startedAt) {
+      return;
+    }
+
+    setProviderLoadingMask((current) => ({ ...current, [provider]: false }));
+  }, []);
 
   // Auto-open in-layout container when user selects a provider tab.
   // nativeContainerStatus and handleOpenInLayoutContainer intentionally omitted — we only want this to fire on tab change.
@@ -147,6 +183,44 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     };
   }, [activeProvider, activeContainerState, syncProviderViewportBounds]);
 
+  useEffect(() => {
+    if (!activeProvider || activeContainerState !== "native_visible" || !shellState.drawerOpen) {
+      return;
+    }
+
+    let cancelled = false;
+    void hideInLayoutProviderContainer(activeProvider)
+      .then(() => {
+        if (cancelled) return;
+        setNativeContainerStatus((current) => ({ ...current, [activeProvider]: "native_hidden" }));
+        setNativeContainerMessage((current) => ({
+          ...current,
+          [activeProvider]: `${providerDisplayName(activeProvider)} provider session is hidden while Cyro navigation is open.`
+        }));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setNativeContainerStatus((current) => ({ ...current, [activeProvider]: "native_failed" }));
+        setNativeContainerMessage((current) => ({
+          ...current,
+          [activeProvider]: formatRuntimeError(error, "In-layout native provider container failed to hide.")
+        }));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProvider, activeContainerState, shellState.drawerOpen]);
+
+  useEffect(() => {
+    if (!activeProvider || shellState.drawerOpen || activeContainerState !== "native_hidden") {
+      return;
+    }
+
+    void handleOpenInLayoutContainer(activeProvider);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProvider, activeContainerState, shellState.drawerOpen]);
+
   async function handleProviderChange(provider: ProviderRouteId) {
     const previousProvider = shellState.selectedProvider;
     if (
@@ -171,6 +245,10 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
           [previousProvider]: formatRuntimeError(error, "In-layout native provider container failed to hide.")
         }));
       }
+    }
+
+    if (isProviderId(provider) && shouldAutoOpenProvider(provider, nativeContainerStatus[provider])) {
+      beginProviderLoadingMask(provider);
     }
 
     dispatch({ type: "select_provider", provider });
@@ -206,6 +284,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
       return;
     }
 
+    const maskStartedAt = beginProviderLoadingMask(provider);
     setNativeContainerStatus((current) => ({ ...current, [provider]: "native_opening" }));
     setNativeContainerMessage((current) => ({
       ...current,
@@ -219,6 +298,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
       }
 
       const result = await openInLayoutProviderContainer(provider, viewportBounds);
+      await settleProviderLoadingMask(provider, maskStartedAt);
       setNativeContainerStatus((current) => ({ ...current, [provider]: providerContainerStateFromNativeStatus(result.status) }));
       setNativeContainerMessage((current) => ({
         ...current,
@@ -226,6 +306,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
           `${result.message} This does not validate provider login, chat, or session persistence; record manual behavior before any success claim.`
       }));
     } catch (error) {
+      await settleProviderLoadingMask(provider, maskStartedAt);
       setNativeContainerStatus((current) => ({ ...current, [provider]: "native_failed" }));
       setNativeContainerMessage((current) => ({
         ...current,
@@ -262,12 +343,74 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     }
   }
 
+  async function handleProviderReload(provider: ProviderRouteId) {
+    if (!isProviderId(provider)) {
+      return;
+    }
+
+    const maskStartedAt = beginProviderLoadingMask(provider);
+    setNativeContainerStatus((current) => ({ ...current, [provider]: "native_opening" }));
+    setNativeContainerMessage((current) => ({
+      ...current,
+      [provider]: `${providerDisplayName(provider)} provider reload requested by the user.`
+    }));
+
+    try {
+      const result = await providerReload(provider);
+      await settleProviderLoadingMask(provider, maskStartedAt);
+      setNativeContainerStatus((current) => ({ ...current, [provider]: "native_visible" }));
+      setNativeContainerMessage((current) => ({
+        ...current,
+        [provider]: `${result.message} Cyro did not read provider DOM, cookies, prompts, or responses.`
+      }));
+      void syncProviderViewportBounds(provider);
+    } catch (error) {
+      await settleProviderLoadingMask(provider, maskStartedAt);
+      setNativeContainerStatus((current) => ({ ...current, [provider]: "native_failed" }));
+      setNativeContainerMessage((current) => ({
+        ...current,
+        [provider]: formatRuntimeError(error, "Provider reload failed.")
+      }));
+    }
+  }
+
+  async function handleProviderHome(provider: ProviderRouteId) {
+    if (!isProviderId(provider)) {
+      return;
+    }
+
+    const maskStartedAt = beginProviderLoadingMask(provider);
+    setNativeContainerStatus((current) => ({ ...current, [provider]: "native_opening" }));
+    setNativeContainerMessage((current) => ({
+      ...current,
+      [provider]: `${providerDisplayName(provider)} provider home requested by the user.`
+    }));
+
+    try {
+      const result = await providerGoHome(provider);
+      await settleProviderLoadingMask(provider, maskStartedAt);
+      setNativeContainerStatus((current) => ({ ...current, [provider]: "native_visible" }));
+      setNativeContainerMessage((current) => ({
+        ...current,
+        [provider]: `${result.message} Cyro accepted only providerId; provider home stayed Rust-allowlisted.`
+      }));
+      void syncProviderViewportBounds(provider);
+    } catch (error) {
+      await settleProviderLoadingMask(provider, maskStartedAt);
+      setNativeContainerStatus((current) => ({ ...current, [provider]: "native_failed" }));
+      setNativeContainerMessage((current) => ({
+        ...current,
+        [provider]: formatRuntimeError(error, "Provider home navigation failed.")
+      }));
+    }
+  }
+
   const isLocalRoute = shellState.selectedProvider === "local";
   const mainClassName = isLocalRoute ? "provider-shell-main local-mode" : "provider-shell-main provider-mode";
   const stageClassName = [
     "provider-chat-stage",
     isLocalRoute ? "local-stage" : "provider-stage",
-    activeContainerState === "native_visible" || activeContainerState === "native_opening" ? "native-canvas-active" : null
+    activeProviderLoadingMask || activeContainerState === "native_visible" || activeContainerState === "native_opening" ? "native-canvas-active" : null
   ]
     .filter(Boolean)
     .join(" ");
@@ -317,12 +460,10 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
               containerState={activeContainerState}
               nativeContainerMessage={nativeContainerMessage[activeProvider]}
               viewportRef={providerViewportRef}
+              loadingMaskActive={activeProviderLoadingMask}
               onOpenInLayoutContainer={() => handleOpenInLayoutContainer(activeProvider)}
-              onOpenSeparateWindowFallback={
-                activeContainerState === "native_visible"
-                  ? undefined
-                  : () => handleOpenSeparateWindowFallback(activeProvider)
-              }
+              onReload={() => handleProviderReload(activeProvider)}
+              onGoHome={() => handleProviderHome(activeProvider)}
             />
           ) : null}
         </section>
@@ -398,5 +539,11 @@ function waitForNextFrame() {
     }
 
     setTimeout(resolve, 0);
+  });
+}
+
+function waitForMs(durationMs: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, durationMs);
   });
 }

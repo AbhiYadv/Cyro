@@ -9,6 +9,8 @@ import {
   isPromptValid,
   openNativeProviderContainer,
   openInLayoutProviderContainer,
+  providerGoHome,
+  providerReload,
   resizeInLayoutProviderContainer,
   runRuntimeBenchmark,
   sendLocalPrompt,
@@ -356,6 +358,50 @@ describe("tauriClient Sprint 0 contract", () => {
     await expect(hideInLayoutProviderContainer("gemini", invoker)).resolves.toMatchObject({
       providerId: "gemini",
       status: "native_hidden"
+    });
+  });
+
+  it("reloads the in-layout provider container by provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("provider_reload");
+      expect(args).toEqual({ providerId: "chatgpt" });
+      expect(JSON.stringify(args)).not.toContain("https://chatgpt.com");
+      return {
+        providerId: "chatgpt",
+        displayName: "ChatGPT",
+        origin: "https://chatgpt.com",
+        windowLabel: "provider-in-layout-chatgpt",
+        surfaceMechanism: "native_child_webview",
+        status: "native_visible",
+        message: "ChatGPT provider session reload requested."
+      } as T;
+    };
+
+    await expect(providerReload("chatgpt", invoker)).resolves.toMatchObject({
+      providerId: "chatgpt",
+      status: "native_visible"
+    });
+  });
+
+  it("navigates provider home by provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("provider_go_home");
+      expect(args).toEqual({ providerId: "gemini" });
+      expect(JSON.stringify(args)).not.toContain("https://gemini.google.com");
+      return {
+        providerId: "gemini",
+        displayName: "Gemini",
+        origin: "https://gemini.google.com",
+        windowLabel: "provider-in-layout-gemini",
+        surfaceMechanism: "native_child_webview",
+        status: "native_visible",
+        message: "Gemini provider session home requested."
+      } as T;
+    };
+
+    await expect(providerGoHome("gemini", invoker)).resolves.toMatchObject({
+      providerId: "gemini",
+      status: "native_visible"
     });
   });
 
