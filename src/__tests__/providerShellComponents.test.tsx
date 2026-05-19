@@ -1,5 +1,6 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { App } from "../app/App";
 import { CyroComposer } from "../components/provider/CyroComposer";
 import { CyroLeftDrawer } from "../components/provider/CyroLeftDrawer";
 import { CyroPresence } from "../components/provider/CyroPresence";
@@ -51,6 +52,16 @@ const runtimeStatus: RuntimeStatus = {
 };
 
 describe("provider shell components", () => {
+  it("uses the provider shell as the active app entrypoint", () => {
+    const html = renderToString(<App />);
+
+    expect(html).toContain("Cyro provider shell chat prototype");
+    expect(html).toContain("Provider route");
+    expect(html).toContain("Cyro is ready");
+    expect(html).not.toContain("SOVEREIGN GPT");
+    expect(html).not.toContain("Cyro Local Brain is online in Sprint 0 shell mode");
+  });
+
   it("renders CyroPresence for the local home state", () => {
     const html = renderToString(<ProviderShellLayout runtimeStatus={runtimeStatus} onRuntimeRefresh={noopAsync} />);
 
