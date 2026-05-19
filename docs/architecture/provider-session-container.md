@@ -96,6 +96,29 @@ This task is UX shell only. The route selector is shell state, not evidence that
 
 Provider shell is not validated yet. Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending. The iframe conclusion remains unchanged: iframe embedding remains a feasibility result, not the final provider-shell solution. ChatGPT is recorded as blank or blocked in an iframe, and Claude/Gemini remain unvalidated until separately tested. The shell may present selected provider routes and explicit fallback links, but it must not claim provider login or chat works inside Cyro. CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture.
 
+## CYRO-PROVIDER-010 Native Webview Container Research
+
+CYRO-PROVIDER-010 adds a narrow Tauri-native provider container spike. React can request a provider container by provider id only. Rust resolves `chatgpt`, `claude`, or `gemini` to a hardcoded origin and opens a visible Tauri `WebviewWindow` for that provider:
+- `chatgpt` -> `https://chatgpt.com`
+- `claude` -> `https://claude.ai`
+- `gemini` -> `https://gemini.google.com`
+
+Unknown provider ids and arbitrary URL strings are rejected before any webview is opened. The frontend never passes provider URLs. The spike uses visible provider windows as the first native container result because an in-panel child webview needs separate sizing, lifecycle, cross-platform, and navigation research before it can be treated as product UX.
+
+The native container spike does not inject JavaScript into provider pages, does not read DOM, does not inspect or export cookies, does not store provider credentials, does not automate login, does not send prompts, does not capture provider responses, and does not import provider output into Cyro memory. Provider content remains provider-owned and user-controlled.
+
+The WebviewWindow is opened in incognito mode for this spike so Cyro does not intentionally persist provider cookies or credentials in a Cyro-managed provider store. This supports feasibility research, but it means persistent login behavior is not proven.
+
+Manual validation status from `pnpm tauri dev` on 2026-05-19:
+
+| Provider | Native mechanism | Manual result | Feasibility finding |
+|---|---|---|---|
+| ChatGPT | Tauri WebviewWindow | Visible provider-owned ChatGPT page loaded at `chatgpt.com/` with logged-out login/sign-up controls. | Native top-level webview can display ChatGPT's logged-out surface. Login and chat usability were not validated because no account login or prompt entry was performed. |
+| Claude | Tauri WebviewWindow | Visible Claude login surface loaded at `claude.ai/login` and showed provider-owned cookie controls. | Native top-level webview can display Claude's login surface. Login and chat usability were not validated because no account login or prompt entry was performed. |
+| Gemini | Tauri WebviewWindow | Visible Gemini surface loaded at `gemini.google.com/app` with sign-in link and logged-out prompt field. | Native top-level webview can display Gemini's logged-out surface. Login and chat usability were not validated because no account login or prompt entry was performed. |
+
+Iframe embedding remains unsuitable as the final provider-shell solution unless a provider is separately proven otherwise. CYRO-PROVIDER-010 proves that a separate visible native WebviewWindow can load all three provider origins in logged-out state on this macOS validation run. It does not prove persistent sessions, account login, provider chat, in-layout child webview UX, cross-platform behavior, provider terms compatibility, or provider response import.
+
 ## Session Isolation Questions
 
 The implementation task must answer these questions before merge:

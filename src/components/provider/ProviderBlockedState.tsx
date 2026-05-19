@@ -1,10 +1,14 @@
 import type { ProviderRouteId } from "../../types/provider";
 import { providerDisplayName, providerRouteStatusText } from "../../services/providerShell";
 import type { ProviderSurfaceStatus } from "../../services/providerShell";
+import type { ProviderNativeContainerStatus } from "../../types/provider";
 
 type ProviderBlockedStateProps = {
   provider: ProviderRouteId;
   status: ProviderSurfaceStatus;
+  nativeContainerStatus?: ProviderNativeContainerStatus;
+  nativeContainerMessage?: string | null;
+  onOpenNativeContainer?: () => void;
 };
 
 const fallbackOrigins: Record<Exclude<ProviderRouteId, "local">, string> = {
@@ -13,7 +17,13 @@ const fallbackOrigins: Record<Exclude<ProviderRouteId, "local">, string> = {
   gemini: "https://gemini.google.com"
 };
 
-export function ProviderBlockedState({ provider, status }: ProviderBlockedStateProps) {
+export function ProviderBlockedState({
+  provider,
+  status,
+  nativeContainerStatus = "untested",
+  nativeContainerMessage = null,
+  onOpenNativeContainer
+}: ProviderBlockedStateProps) {
   const providerName = providerDisplayName(provider);
 
   if (provider === "local") {
@@ -49,9 +59,27 @@ export function ProviderBlockedState({ provider, status }: ProviderBlockedStateP
         validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response
         capture.
       </p>
-      <a className="provider-fallback-link" href={fallbackOrigins[provider]} target="_blank" rel="noreferrer">
-        Explicit fallback
-      </a>
+      <p className="provider-native-boundary">No DOM, cookie, credential, prompt, or response capture.</p>
+      <div className="provider-container-actions">
+        {onOpenNativeContainer ? (
+          <button
+            className="provider-native-button"
+            type="button"
+            onClick={onOpenNativeContainer}
+            disabled={nativeContainerStatus === "opening"}
+          >
+            {nativeContainerStatus === "opening" ? "Opening native container" : "Open native container"}
+          </button>
+        ) : null}
+        <a className="provider-fallback-link" href={fallbackOrigins[provider]} target="_blank" rel="noreferrer">
+          Explicit fallback
+        </a>
+      </div>
+      {nativeContainerMessage ? (
+        <p className="provider-native-status" role="status">
+          {nativeContainerMessage}
+        </p>
+      ) : null}
     </article>
   );
 }

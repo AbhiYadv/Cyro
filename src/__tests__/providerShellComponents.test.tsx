@@ -86,7 +86,14 @@ describe("provider shell components", () => {
   });
 
   it("renders ChatGPT blocked state without an iframe panel", () => {
-    const html = renderToString(<ProviderBlockedState provider="chatgpt" status="blocked" />);
+    const html = renderToString(
+      <ProviderBlockedState
+        provider="chatgpt"
+        status="blocked"
+        nativeContainerStatus="untested"
+        onOpenNativeContainer={noop}
+      />
+    );
 
     expect(html).toContain("Provider shell is not validated yet.");
     expect(html).toContain("Iframe display is blocked");
@@ -94,6 +101,8 @@ describe("provider shell components", () => {
     expect(html).toContain("Iframe embedding remains a feasibility result, not the final provider-shell solution.");
     expect(html).toContain("CYRO-PROVIDER-010");
     expect(html).toContain("Tauri-native visible webview/session container");
+    expect(html).toContain("Open native container");
+    expect(html).toContain("No DOM, cookie, credential, prompt, or response capture.");
     expect(html).toContain("Explicit fallback");
   });
 

@@ -5,6 +5,7 @@ import {
   getProviderSession,
   getRuntimeStatus,
   isPromptValid,
+  openNativeProviderContainer,
   runRuntimeBenchmark,
   sendLocalPrompt,
   sendLocalPromptStreaming,
@@ -223,6 +224,36 @@ describe("tauriClient Sprint 0 contract", () => {
       surfaceMechanism: "iframe",
       feasibilityStatus: "blocked_blank"
     });
+  });
+
+  it("requests the native provider container by provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("open_native_provider_container");
+      expect(args).toEqual({ providerId: "gemini" });
+      expect(JSON.stringify(args)).not.toContain("https://gemini.google.com");
+      return {
+        providerId: "gemini",
+        displayName: "Gemini",
+        origin: "https://gemini.google.com",
+        windowLabel: "provider-gemini",
+        surfaceMechanism: "native_webview_window",
+        status: "visible",
+        message: "Gemini native provider window opened. Provider-owned content remains visible and user-controlled."
+      } as T;
+    };
+
+    await expect(openNativeProviderContainer("gemini", invoker)).resolves.toMatchObject({
+      providerId: "gemini",
+      windowLabel: "provider-gemini",
+      surfaceMechanism: "native_webview_window",
+      status: "visible"
+    });
+  });
+
+  it("does not pretend the native provider container opens in browser preview", async () => {
+    await expect(openNativeProviderContainer("chatgpt")).rejects.toThrow(
+      "Native provider container requires the Tauri app."
+    );
   });
 
   it("sends a mocked local prompt response with the selected mode", async () => {
