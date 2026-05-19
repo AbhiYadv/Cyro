@@ -6,8 +6,10 @@ import {
   providerShellReducer,
   shellComposerPlaceholder
 } from "../../services/providerShell";
+import { isProviderId } from "../../services/providerSession";
+import { formatRuntimeError, openNativeProviderContainer } from "../../services/tauriClient";
 import type { ProviderShellReasoningMode } from "../../services/providerShell";
-import type { ProviderRouteId } from "../../types/provider";
+import type { ProviderId, ProviderNativeContainerStatus, ProviderRouteId } from "../../types/provider";
 import type { RuntimeStatus } from "../../types/runtime";
 import { CyroComposer } from "./CyroComposer";
 import { CyroLeftDrawer } from "./CyroLeftDrawer";
@@ -24,6 +26,16 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
   const [shellState, dispatch] = useReducer(providerShellReducer, defaultProviderShellState);
   const [prompt, setPrompt] = useState("");
   const [composerNotice, setComposerNotice] = useState<string | null>(null);
+  const [nativeContainerStatus, setNativeContainerStatus] = useState<Record<ProviderId, ProviderNativeContainerStatus>>({
+    chatgpt: "untested",
+    claude: "untested",
+    gemini: "untested"
+  });
+  const [nativeContainerMessage, setNativeContainerMessage] = useState<Record<ProviderId, string | null>>({
+    chatgpt: null,
+    claude: null,
+    gemini: null
+  });
 
   function handleProviderChange(provider: ProviderRouteId) {
     dispatch({ type: "select_provider", provider });
@@ -52,6 +64,34 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
   function handleStop() {
     dispatch({ type: "set_generation_state", generationState: "cancelled" });
     setComposerNotice("Shell generation state cancelled. No provider session was controlled.");
+  }
+
+  async function handleOpenNativeContainer(provider: ProviderRouteId) {
+    if (!isProviderId(provider)) {
+      return;
+    }
+
+    setNativeContainerStatus((current) => ({ ...current, [provider]: "opening" }));
+    setNativeContainerMessage((current) => ({
+      ...current,
+      [provider]: `${providerDisplayName(provider)} native container opening. Provider page stays visible and user-controlled.`
+    }));
+
+    try {
+      const result = await openNativeProviderContainer(provider);
+      setNativeContainerStatus((current) => ({ ...current, [provider]: result.status }));
+      setNativeContainerMessage((current) => ({
+        ...current,
+        [provider]:
+          `${result.message} This does not validate provider login or chat; record manual behavior before any success claim.`
+      }));
+    } catch (error) {
+      setNativeContainerStatus((current) => ({ ...current, [provider]: "failed" }));
+      setNativeContainerMessage((current) => ({
+        ...current,
+        [provider]: formatRuntimeError(error, "Native provider container failed to open.")
+      }));
+    }
   }
 
   return (
@@ -84,7 +124,13 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
               <h1>Cyro is ready</h1>
             </div>
           ) : (
-            <ProviderBlockedState provider={shellState.selectedProvider} status={shellState.providerSurfaceStatus} />
+            <ProviderBlockedState
+              provider={shellState.selectedProvider}
+              status={shellState.providerSurfaceStatus}
+              nativeContainerStatus={nativeContainerStatus[shellState.selectedProvider]}
+              nativeContainerMessage={nativeContainerMessage[shellState.selectedProvider]}
+              onOpenNativeContainer={() => handleOpenNativeContainer(shellState.selectedProvider)}
+            />
           )}
         </section>
 

@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { placeholderModelRegistry } from "./modelRegistry";
 import { mockedSidecarStatus } from "./sidecar";
-import type { ProviderId, ProviderSessionDescriptor } from "../types/provider";
+import type { ProviderId, ProviderNativeContainerResult, ProviderSessionDescriptor } from "../types/provider";
 import type {
   CancelGenerationResponse,
   HealthCheck,
@@ -157,6 +157,14 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
     throw new Error("This provider route is not allowlisted.");
   }
 
+  if (command === "open_native_provider_container") {
+    const providerId = args?.providerId;
+    if (providerId === "chatgpt" || providerId === "claude" || providerId === "gemini") {
+      throw new Error("Native provider container requires the Tauri app. Browser preview cannot open provider webviews.");
+    }
+    throw new Error("This provider route is not allowlisted.");
+  }
+
   throw new Error(`Unknown Sprint 0 command: ${command}`);
 }
 
@@ -259,6 +267,10 @@ export async function setRuntimeBackendMode(mode: RuntimeBackendMode, invoker: T
 
 export async function getProviderSession(providerId: ProviderId, invoker: TauriInvoker = defaultInvoker) {
   return invoker<ProviderSessionDescriptor>("get_provider_session", { providerId });
+}
+
+export async function openNativeProviderContainer(providerId: ProviderId, invoker: TauriInvoker = defaultInvoker) {
+  return invoker<ProviderNativeContainerResult>("open_native_provider_container", { providerId });
 }
 
 export function formatRuntimeError(error: unknown, fallback = "The local runtime command failed.") {

@@ -149,6 +149,7 @@ Final provider shell UX target:
 - Provider shell is not validated yet. Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending.
 - iframe embedding remains a feasibility result, not the final provider-shell solution; ChatGPT remains blocked/blank and Claude/Gemini remain unvalidated until separately proven
 - CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture before claiming embedded provider hosting works
+- CYRO-PROVIDER-010 currently treats a separate visible Tauri WebviewWindow as an interim research surface. It is opened only from hardcoded provider ids. The macOS native validation run showed logged-out ChatGPT, Claude, and Gemini provider surfaces loading visibly, but it does not prove final in-layout provider UX, account login, persistent sessions, or provider chat.
 
 The composer has a route selector for:
 - Local
@@ -177,6 +178,8 @@ Current temporary provider behavior is limited to safe external-browser fallback
 External browser fallback is temporary and only used when embedded provider session is unavailable, blocked, or not yet implemented.
 
 Future embedded provider sessions must be approved through the Provider Account Bridge ADR, Provider Session Container design, and Provider Session Security contract before implementation. Until then, Cyro must not claim that provider chats continue fully inside Cyro. Provider-owned content must remain visible and user-controlled inside an isolated Cyro provider surface.
+
+CYRO-PROVIDER-010 status: native provider container research is allowed only as a visible, user-controlled feasibility spike. The current spike does not add provider APIs, scraping, DOM reading, JavaScript injection, cookie capture/export, credential storage, prompt automation, response capture, or memory import. Provider routes remain unvalidated for product use until manual native testing records account login, chat usability, cross-platform behavior, and provider-specific blockers.
 
 ### Provider Account Bridge User Stories
 

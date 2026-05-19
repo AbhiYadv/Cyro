@@ -30,6 +30,16 @@ CYRO-PROVIDER-009 is a React shell UX prototype only. It may render the Cyro-own
 
 It does not authorize or implement provider APIs, provider SDKs, scraping, DOM reading, auto-login, credential storage, cookie capture, cookie export, prompt injection, automated prompt sending, provider response capture, provider memory import, or bypass behavior. Provider routes remain visible shell state until a separate Tauri-native provider container research task proves an acceptable session boundary. Iframe embedding remains a feasibility result, not the final provider-shell solution. CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture.
 
+## CYRO-PROVIDER-010 Native Webview Security Addendum
+
+CYRO-PROVIDER-010 is a native container feasibility spike, not a provider automation feature. The only frontend request shape is `{ providerId }`; Rust maps the provider id to a hardcoded allowlisted origin and rejects unknown ids or arbitrary URL strings.
+
+The spike opens provider-owned content in a visible Tauri `WebviewWindow`. It does not add provider APIs, scraping, DOM reading, JavaScript injection, auto-login, credential handling, cookie capture, cookie export, cookie manipulation, prompt automation, provider response capture, provider memory import, hidden sessions, or bypass behavior.
+
+The WebviewWindow is incognito for this spike so Cyro does not intentionally persist provider cookies or credentials in a Cyro-managed provider data directory. Cyro code still must not inspect provider cookies, tokens, local storage, DOM, or response text. Provider login and provider interaction remain manual and user-controlled.
+
+Provider pop-up windows are denied in this spike to avoid uncontrolled secondary provider windows. This may degrade some login flows and must be recorded in manual validation instead of bypassed.
+
 ## Future Embedded Session Conditions
 
 Embedded provider sessions may be considered only if all of these are satisfied:

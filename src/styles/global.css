@@ -1120,6 +1120,36 @@ textarea:disabled {
   text-decoration: none;
 }
 
+.provider-native-boundary,
+.provider-native-status {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.provider-container-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.provider-native-button {
+  width: max-content;
+  border: 1px solid rgba(125, 249, 214, 0.34);
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+  background: rgba(125, 249, 214, 0.12);
+  color: #d8fff7;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.provider-native-button:disabled {
+  cursor: progress;
+  opacity: 0.68;
+}
+
 .composer-notice {
   width: min(100% - 2rem, 68rem);
   margin: 0 auto 1rem;
