@@ -184,6 +184,8 @@ CYRO-PROVIDER-010 status: native provider container research is allowed only as 
 
 CYRO-PROVIDER-011 status: in-layout native provider container research is allowed only as a visible, user-controlled child-webview feasibility spike. The prototype preserves provider-id-only frontend requests, Rust-owned origin allowlisting, no DOM/cookie/credential/prompt/response capture, and explicit separate-window fallback. Manual native validation must still prove whether ChatGPT, Claude, and Gemini actually render inside the main Cyro shell.
 
+CYRO-PROVIDER-011 layout target: when a native provider child webview is visible, the main content area becomes a provider canvas reservation instead of a blocked-provider card. The Cyro header and bottom composer remain visible, and the canvas must show `Provider-owned native session. Cyro cannot read this content.` Current bounds are an interim fixed-safe shell rectangle with resize handling; final product UX still needs measured responsive placement and login/session validation.
+
 ### Provider Account Bridge User Stories
 
 - As a user, I can choose Local, ChatGPT, Claude, Gemini, or a future provider from one Cyro composer.

@@ -32,7 +32,9 @@ pub struct ProviderNativeContainerResult {
     pub message: String,
 }
 
-const PROVIDER_IN_LAYOUT_TOP: f64 = 96.0;
+const PROVIDER_IN_LAYOUT_CANVAS_TOP: f64 = 144.0;
+const PROVIDER_IN_LAYOUT_LABEL_HEIGHT: f64 = 44.0;
+const PROVIDER_IN_LAYOUT_LABEL_GAP: f64 = 8.0;
 const PROVIDER_IN_LAYOUT_BOTTOM_RESERVED: f64 = 236.0;
 const PROVIDER_IN_LAYOUT_DESKTOP_MARGIN: f64 = 40.0;
 const PROVIDER_IN_LAYOUT_MOBILE_MARGIN: f64 = 16.0;
@@ -67,7 +69,7 @@ pub async fn open_in_layout_provider_container(
         })?;
 
         return Ok(target.with_status(
-            "in_layout",
+            "native_visible",
             format!(
                 "{} in-layout native provider webview is attached to the main Cyro window. This validates placement only, not login, chat, or session persistence.",
                 target.display_name
@@ -105,11 +107,39 @@ pub async fn open_in_layout_provider_container(
                 Some(error.to_string()),
             )
         })?;
+    attach_provider_resize_handler(&app, &window, target.window_label);
 
     Ok(target.with_status(
-        "in_layout",
+        "native_visible",
         format!(
             "{} in-layout native provider webview opened inside the main Cyro window. This validates placement only, not login, chat, or session persistence.",
+            target.display_name
+        ),
+    ))
+}
+
+#[tauri::command]
+pub async fn close_in_layout_provider_container(
+    app: tauri::AppHandle,
+    provider_id: String,
+) -> Result<ProviderNativeContainerResult, RuntimeError> {
+    let target = resolve_in_layout_provider_container(&provider_id)?;
+
+    if let Some(webview) = app.get_webview(target.window_label) {
+        webview.close().map_err(|error| {
+            RuntimeError::recoverable(
+                "provider_in_layout_close_failed",
+                "Cyro could not close the in-layout provider webview.",
+                "Close and reopen Cyro before continuing provider container validation.",
+                Some(error.to_string()),
+            )
+        })?;
+    }
+
+    Ok(target.with_status(
+        "idle",
+        format!(
+            "{} in-layout native provider webview closed. No provider content was read by Cyro.",
             target.display_name
         ),
     ))
@@ -318,7 +348,7 @@ fn native_container_target(
         origin,
         window_label,
         surface_mechanism: "native_webview_window",
-        status: "untested",
+        status: "idle",
         message: "Native provider container has not been opened in this session.".to_string(),
     }
 }
@@ -335,7 +365,7 @@ fn native_child_container_target(
         origin,
         window_label,
         surface_mechanism: "native_child_webview",
-        status: "untested",
+        status: "idle",
         message: "In-layout native provider container has not been opened in this session."
             .to_string(),
     }
@@ -381,15 +411,44 @@ fn provider_in_layout_bounds(window: &tauri::Window) -> Result<Rect, RuntimeErro
     };
     let x = ((logical_size.width - shell_width) / 2.0).max(0.0) + margin;
     let width = (shell_width - (margin * 2.0)).max(320.0);
+    let y = PROVIDER_IN_LAYOUT_CANVAS_TOP
+        + PROVIDER_IN_LAYOUT_LABEL_HEIGHT
+        + PROVIDER_IN_LAYOUT_LABEL_GAP;
     let height = (logical_size.height
-        - PROVIDER_IN_LAYOUT_TOP
+        - y
         - PROVIDER_IN_LAYOUT_BOTTOM_RESERVED)
         .max(280.0);
 
     Ok(Rect {
-        position: LogicalPosition::new(x, PROVIDER_IN_LAYOUT_TOP).into(),
+        position: LogicalPosition::new(x, y).into(),
         size: LogicalSize::new(width, height).into(),
     })
+}
+
+fn attach_provider_resize_handler(
+    app: &tauri::AppHandle,
+    window: &tauri::Window,
+    active_label: &'static str,
+) {
+    let app_for_resize = app.clone();
+    let window_for_resize = window.clone();
+
+    window.on_window_event(move |event| {
+        if !matches!(
+            event,
+            tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
+        ) {
+            return;
+        }
+
+        let Some(webview) = app_for_resize.get_webview(active_label) else {
+            return;
+        };
+        let Ok(bounds) = provider_in_layout_bounds(&window_for_resize) else {
+            return;
+        };
+        let _ = webview.set_bounds(bounds);
+    });
 }
 
 fn close_other_in_layout_provider_webviews(
@@ -461,7 +520,7 @@ mod tests {
         assert_eq!(chatgpt.origin, "https://chatgpt.com");
         assert_eq!(chatgpt.window_label, "provider-chatgpt");
         assert_eq!(chatgpt.surface_mechanism, "native_webview_window");
-        assert_eq!(chatgpt.status, "untested");
+        assert_eq!(chatgpt.status, "idle");
         assert_eq!(claude.origin, "https://claude.ai");
         assert_eq!(gemini.origin, "https://gemini.google.com");
     }
@@ -485,7 +544,7 @@ mod tests {
         assert_eq!(chatgpt.origin, "https://chatgpt.com");
         assert_eq!(chatgpt.window_label, "provider-in-layout-chatgpt");
         assert_eq!(chatgpt.surface_mechanism, "native_child_webview");
-        assert_eq!(chatgpt.status, "untested");
+        assert_eq!(chatgpt.status, "idle");
         assert_eq!(claude.origin, "https://claude.ai");
         assert_eq!(gemini.origin, "https://gemini.google.com");
     }

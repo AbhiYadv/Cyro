@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatRuntimeError,
   cancelGeneration,
+  closeInLayoutProviderContainer,
   getProviderSession,
   getRuntimeStatus,
   isPromptValid,
@@ -262,7 +263,7 @@ describe("tauriClient Sprint 0 contract", () => {
         origin: "https://claude.ai",
         windowLabel: "provider-in-layout-claude",
         surfaceMechanism: "native_child_webview",
-        status: "in_layout",
+        status: "native_visible",
         message: "Claude in-layout native provider webview opened inside the main Cyro window."
       } as T;
     };
@@ -271,7 +272,7 @@ describe("tauriClient Sprint 0 contract", () => {
       providerId: "claude",
       windowLabel: "provider-in-layout-claude",
       surfaceMechanism: "native_child_webview",
-      status: "in_layout"
+      status: "native_visible"
     });
   });
 
@@ -279,6 +280,28 @@ describe("tauriClient Sprint 0 contract", () => {
     await expect(openInLayoutProviderContainer("gemini")).rejects.toThrow(
       "In-layout native provider container requires the Tauri app."
     );
+  });
+
+  it("requests in-layout provider container close by provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("close_in_layout_provider_container");
+      expect(args).toEqual({ providerId: "chatgpt" });
+      expect(JSON.stringify(args)).not.toContain("https://chatgpt.com");
+      return {
+        providerId: "chatgpt",
+        displayName: "ChatGPT",
+        origin: "https://chatgpt.com",
+        windowLabel: "provider-in-layout-chatgpt",
+        surfaceMechanism: "native_child_webview",
+        status: "idle",
+        message: "ChatGPT in-layout native provider webview closed."
+      } as T;
+    };
+
+    await expect(closeInLayoutProviderContainer("chatgpt", invoker)).resolves.toMatchObject({
+      providerId: "chatgpt",
+      status: "idle"
+    });
   });
 
   it("does not pretend the native provider container opens in browser preview", async () => {

@@ -488,6 +488,7 @@ pub fn run() {
             llama_cli::set_runtime_backend_mode,
             benchmark::run_runtime_benchmark,
             provider_session::get_provider_session,
+            provider_session::close_in_layout_provider_container,
             provider_session::open_in_layout_provider_container,
             provider_session::open_native_provider_container,
             send_local_prompt,

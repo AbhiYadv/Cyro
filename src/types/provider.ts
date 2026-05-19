@@ -2,15 +2,14 @@ export type ProviderId = "chatgpt" | "claude" | "gemini";
 export type ProviderRouteId = "local" | ProviderId;
 export type ProviderSurfaceMechanism = "iframe" | "native_webview_window" | "native_child_webview";
 export type ProviderFeasibilityStatus = "blocked_blank" | "not_tested";
-export type ProviderNativeContainerStatus =
-  | "untested"
-  | "opening"
-  | "in_layout"
-  | "separate_window_fallback"
-  | "visible"
-  | "blocked"
-  | "failed"
-  | "fallback";
+export type ProviderContainerState =
+  | "idle"
+  | "iframe_blocked"
+  | "native_opening"
+  | "native_visible"
+  | "native_failed"
+  | "separate_window_fallback";
+export type ProviderNativeContainerStatus = ProviderContainerState;
 
 export type ProviderSessionDescriptor = {
   providerId: ProviderId;

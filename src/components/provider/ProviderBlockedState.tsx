@@ -1,12 +1,11 @@
-import type { ProviderRouteId } from "../../types/provider";
+import type { ProviderContainerState, ProviderRouteId } from "../../types/provider";
 import { providerDisplayName, providerRouteStatusText } from "../../services/providerShell";
 import type { ProviderSurfaceStatus } from "../../services/providerShell";
-import type { ProviderNativeContainerStatus } from "../../types/provider";
 
 type ProviderBlockedStateProps = {
   provider: ProviderRouteId;
   status: ProviderSurfaceStatus;
-  nativeContainerStatus?: ProviderNativeContainerStatus;
+  containerState?: ProviderContainerState;
   nativeContainerMessage?: string | null;
   onOpenInLayoutContainer?: () => void;
   onOpenSeparateWindowFallback?: () => void;
@@ -21,7 +20,7 @@ const fallbackOrigins: Record<Exclude<ProviderRouteId, "local">, string> = {
 export function ProviderBlockedState({
   provider,
   status,
-  nativeContainerStatus = "untested",
+  containerState = "idle",
   nativeContainerMessage = null,
   onOpenInLayoutContainer,
   onOpenSeparateWindowFallback
@@ -42,7 +41,7 @@ export function ProviderBlockedState({
   }
 
   const isBlocked = status === "blocked";
-  const nativeStatusLabel = nativeContainerStatusLabel(nativeContainerStatus);
+  const nativeStatusLabel = nativeContainerStatusLabel(containerState);
 
   return (
     <article className={isBlocked ? "provider-blocked-state blocked" : "provider-blocked-state"} aria-live="polite">
@@ -69,9 +68,9 @@ export function ProviderBlockedState({
             className="provider-native-button"
             type="button"
             onClick={onOpenInLayoutContainer}
-            disabled={nativeContainerStatus === "opening"}
+            disabled={containerState === "native_opening"}
           >
-            {nativeContainerStatus === "opening" ? "Opening in-layout container" : "Open in-layout container"}
+            {containerState === "native_opening" ? "Opening in-layout container" : "Open in-layout container"}
           </button>
         ) : null}
         {onOpenSeparateWindowFallback ? (
@@ -79,7 +78,7 @@ export function ProviderBlockedState({
             className="provider-native-button secondary"
             type="button"
             onClick={onOpenSeparateWindowFallback}
-            disabled={nativeContainerStatus === "opening"}
+            disabled={containerState === "native_opening"}
           >
             Separate window fallback
           </button>
@@ -97,18 +96,18 @@ export function ProviderBlockedState({
   );
 }
 
-function nativeContainerStatusLabel(status: ProviderNativeContainerStatus) {
+function nativeContainerStatusLabel(status: ProviderContainerState) {
   switch (status) {
-    case "in_layout":
-      return "In-layout prototype";
+    case "native_visible":
+      return "Native visible";
     case "separate_window_fallback":
       return "Separate window fallback";
-    case "blocked":
-      return "Blocked";
-    case "failed":
+    case "native_failed":
       return "Failed";
-    case "opening":
+    case "native_opening":
       return "Opening";
+    case "iframe_blocked":
+      return "Blocked";
     default:
       return null;
   }

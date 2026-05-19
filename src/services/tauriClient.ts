@@ -173,6 +173,22 @@ async function mockInvoke<T>(command: string, args?: CommandArgs): Promise<T> {
     throw new Error("This provider route is not allowlisted.");
   }
 
+  if (command === "close_in_layout_provider_container") {
+    const providerId = args?.providerId;
+    if (providerId === "chatgpt" || providerId === "claude" || providerId === "gemini") {
+      return {
+        providerId,
+        displayName: providerId === "chatgpt" ? "ChatGPT" : providerId === "claude" ? "Claude" : "Gemini",
+        origin: providerId === "chatgpt" ? "https://chatgpt.com" : providerId === "claude" ? "https://claude.ai" : "https://gemini.google.com",
+        windowLabel: `provider-in-layout-${providerId}`,
+        surfaceMechanism: "native_child_webview",
+        status: "idle",
+        message: "Mock in-layout provider webview closed."
+      } as T;
+    }
+    throw new Error("This provider route is not allowlisted.");
+  }
+
   throw new Error(`Unknown Sprint 0 command: ${command}`);
 }
 
@@ -283,6 +299,10 @@ export async function openNativeProviderContainer(providerId: ProviderId, invoke
 
 export async function openInLayoutProviderContainer(providerId: ProviderId, invoker: TauriInvoker = defaultInvoker) {
   return invoker<ProviderNativeContainerResult>("open_in_layout_provider_container", { providerId });
+}
+
+export async function closeInLayoutProviderContainer(providerId: ProviderId, invoker: TauriInvoker = defaultInvoker) {
+  return invoker<ProviderNativeContainerResult>("close_in_layout_provider_container", { providerId });
 }
 
 export function formatRuntimeError(error: unknown, fallback = "The local runtime command failed.") {

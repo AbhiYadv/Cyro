@@ -50,6 +50,8 @@ The child webview is incognito for this spike and denies provider popup windows.
 
 Manual native validation did not complete in this run because the environment rejected launching `pnpm tauri dev`. No provider route may be marked as validated in-layout until ChatGPT, Claude, and Gemini are each manually tested in the native app.
 
+CYRO-PROVIDER-011 layout integration adds only Cyro-owned state and framing around the native child webview. When provider content is native-visible, React removes the blocked card and renders a provider canvas reservation with the label `Provider-owned native session. Cyro cannot read this content.` The label is Cyro-owned UI; it does not inspect provider DOM, cookies, credentials, prompts, or responses.
+
 ## Future Embedded Session Conditions
 
 Embedded provider sessions may be considered only if all of these are satisfied:

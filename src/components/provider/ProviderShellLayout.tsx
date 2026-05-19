@@ -8,17 +8,23 @@ import {
 } from "../../services/providerShell";
 import { isProviderId } from "../../services/providerSession";
 import {
+  closeInLayoutProviderContainer,
   formatRuntimeError,
   openInLayoutProviderContainer,
   openNativeProviderContainer
 } from "../../services/tauriClient";
 import type { ProviderShellReasoningMode } from "../../services/providerShell";
-import type { ProviderId, ProviderNativeContainerStatus, ProviderRouteId } from "../../types/provider";
+import type {
+  ProviderContainerState,
+  ProviderId,
+  ProviderNativeContainerStatus,
+  ProviderRouteId
+} from "../../types/provider";
 import type { RuntimeStatus } from "../../types/runtime";
 import { CyroComposer } from "./CyroComposer";
 import { CyroLeftDrawer } from "./CyroLeftDrawer";
 import { CyroPresence } from "./CyroPresence";
-import { ProviderBlockedState } from "./ProviderBlockedState";
+import { ProviderContainerSurface } from "./ProviderContainerSurface";
 import { ProviderHeader } from "./ProviderHeader";
 
 type ProviderShellLayoutProps = {
@@ -30,10 +36,10 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
   const [shellState, dispatch] = useReducer(providerShellReducer, defaultProviderShellState);
   const [prompt, setPrompt] = useState("");
   const [composerNotice, setComposerNotice] = useState<string | null>(null);
-  const [nativeContainerStatus, setNativeContainerStatus] = useState<Record<ProviderId, ProviderNativeContainerStatus>>({
-    chatgpt: "untested",
-    claude: "untested",
-    gemini: "untested"
+  const [nativeContainerStatus, setNativeContainerStatus] = useState<Record<ProviderId, ProviderContainerState>>({
+    chatgpt: "iframe_blocked",
+    claude: "idle",
+    gemini: "idle"
   });
   const [nativeContainerMessage, setNativeContainerMessage] = useState<Record<ProviderId, string | null>>({
     chatgpt: null,
@@ -41,7 +47,29 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     gemini: null
   });
 
-  function handleProviderChange(provider: ProviderRouteId) {
+  async function handleProviderChange(provider: ProviderRouteId) {
+    const previousProvider = shellState.selectedProvider;
+    if (
+      provider !== previousProvider &&
+      isProviderId(previousProvider) &&
+      nativeContainerStatus[previousProvider] === "native_visible"
+    ) {
+      try {
+        await closeInLayoutProviderContainer(previousProvider);
+        setNativeContainerStatus((current) => ({
+          ...current,
+          [previousProvider]: defaultContainerStateForProvider(previousProvider)
+        }));
+        setNativeContainerMessage((current) => ({ ...current, [previousProvider]: null }));
+      } catch (error) {
+        setNativeContainerStatus((current) => ({ ...current, [previousProvider]: "native_failed" }));
+        setNativeContainerMessage((current) => ({
+          ...current,
+          [previousProvider]: formatRuntimeError(error, "In-layout native provider container failed to close.")
+        }));
+      }
+    }
+
     dispatch({ type: "select_provider", provider });
     setComposerNotice(null);
   }
@@ -75,7 +103,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
       return;
     }
 
-    setNativeContainerStatus((current) => ({ ...current, [provider]: "opening" }));
+    setNativeContainerStatus((current) => ({ ...current, [provider]: "native_opening" }));
     setNativeContainerMessage((current) => ({
       ...current,
       [provider]: `${providerDisplayName(provider)} in-layout native container opening. Provider page stays visible and user-controlled.`
@@ -83,14 +111,14 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
 
     try {
       const result = await openInLayoutProviderContainer(provider);
-      setNativeContainerStatus((current) => ({ ...current, [provider]: result.status }));
+      setNativeContainerStatus((current) => ({ ...current, [provider]: providerContainerStateFromNativeStatus(result.status) }));
       setNativeContainerMessage((current) => ({
         ...current,
         [provider]:
           `${result.message} This does not validate provider login, chat, or session persistence; record manual behavior before any success claim.`
       }));
     } catch (error) {
-      setNativeContainerStatus((current) => ({ ...current, [provider]: "failed" }));
+      setNativeContainerStatus((current) => ({ ...current, [provider]: "native_failed" }));
       setNativeContainerMessage((current) => ({
         ...current,
         [provider]: formatRuntimeError(error, "In-layout native provider container failed to open.")
@@ -103,7 +131,7 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
       return;
     }
 
-    setNativeContainerStatus((current) => ({ ...current, [provider]: "opening" }));
+    setNativeContainerStatus((current) => ({ ...current, [provider]: "native_opening" }));
     setNativeContainerMessage((current) => ({
       ...current,
       [provider]: `${providerDisplayName(provider)} separate-window fallback opening. This is not final in-layout UX.`
@@ -111,20 +139,24 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
 
     try {
       const result = await openNativeProviderContainer(provider);
-      setNativeContainerStatus((current) => ({ ...current, [provider]: result.status }));
+      setNativeContainerStatus((current) => ({ ...current, [provider]: providerContainerStateFromNativeStatus(result.status) }));
       setNativeContainerMessage((current) => ({
         ...current,
         [provider]:
           `${result.message} Separate-window fallback does not validate final in-layout provider UX, login, chat, or session persistence.`
       }));
     } catch (error) {
-      setNativeContainerStatus((current) => ({ ...current, [provider]: "failed" }));
+      setNativeContainerStatus((current) => ({ ...current, [provider]: "native_failed" }));
       setNativeContainerMessage((current) => ({
         ...current,
         [provider]: formatRuntimeError(error, "Separate-window provider fallback failed to open.")
       }));
     }
   }
+
+  const activeContainerState = isProviderId(shellState.selectedProvider)
+    ? nativeContainerStatus[shellState.selectedProvider]
+    : "idle";
 
   return (
     <div className="provider-shell-layout">
@@ -140,12 +172,20 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
           reasoningMode={shellState.reasoningMode}
           generationState={shellState.generationState}
           providerSurfaceStatus={shellState.providerSurfaceStatus}
+          providerContainerState={activeContainerState}
           diagnosticsOpen={shellState.diagnosticsOpen}
           onDrawerToggle={() => dispatch({ type: "toggle_drawer" })}
           onDiagnosticsToggle={() => dispatch({ type: "toggle_diagnostics" })}
         />
 
-        <section className="provider-chat-stage" aria-label="Provider shell stage">
+        <section
+          className={
+            activeContainerState === "native_visible"
+              ? "provider-chat-stage native-canvas-active"
+              : "provider-chat-stage"
+          }
+          aria-label="Provider shell stage"
+        >
           {shellState.selectedProvider === "local" ? (
             <div className="provider-home-presence">
               <CyroPresence
@@ -156,10 +196,10 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
               <h1>Cyro is ready</h1>
             </div>
           ) : (
-            <ProviderBlockedState
+            <ProviderContainerSurface
               provider={shellState.selectedProvider}
               status={shellState.providerSurfaceStatus}
-              nativeContainerStatus={nativeContainerStatus[shellState.selectedProvider]}
+              containerState={activeContainerState}
               nativeContainerMessage={nativeContainerMessage[shellState.selectedProvider]}
               onOpenInLayoutContainer={() => handleOpenInLayoutContainer(shellState.selectedProvider)}
               onOpenSeparateWindowFallback={() => handleOpenSeparateWindowFallback(shellState.selectedProvider)}
@@ -206,4 +246,28 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
       </main>
     </div>
   );
+}
+
+function providerContainerStateFromNativeStatus(status: ProviderNativeContainerStatus): ProviderContainerState {
+  if (status === "native_visible") {
+    return "native_visible";
+  }
+
+  if (status === "separate_window_fallback") {
+    return "separate_window_fallback";
+  }
+
+  if (status === "native_opening") {
+    return "native_opening";
+  }
+
+  if (status === "native_failed") {
+    return "native_failed";
+  }
+
+  return "idle";
+}
+
+function defaultContainerStateForProvider(provider: ProviderId): ProviderContainerState {
+  return provider === "chatgpt" ? "iframe_blocked" : "idle";
 }

@@ -46,6 +46,8 @@ CYRO-PROVIDER-010's current implementation opens a separate visible Tauri-native
 
 CYRO-PROVIDER-011's current implementation tests the in-layout native child webview path. It is also feasibility research only. It does not validate provider login, provider chat, persistent sessions, or final responsive layout behavior. The separate `WebviewWindow` path remains fallback only and must not be presented as final product UX.
 
+CYRO-PROVIDER-011 layout integration keeps the Cyro header and composer as the shell frame. Once an in-layout native provider child webview is visible, the blocked-provider card is replaced by a Cyro-owned provider canvas reservation with an explicit provider-owned-content boundary label. The current bounds are an interim fixed-safe content rectangle with resize handling, not a final fully measured layout engine.
+
 Cyro remains the control plane for memory, vault, privacy filtering, provider route selection, and context capsule preparation.
 
 Provider-owned content must remain visible and user-controlled inside an isolated Cyro provider surface.

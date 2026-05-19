@@ -140,9 +140,17 @@ Manual validation status on 2026-05-19: code-level validation compiled, but nati
 
 The separate `WebviewWindow` path remains an explicit fallback only. It is not final product UX because the final Provider Account Bridge target is one Cyro chat surface with the composer and provider header remaining in the main shell.
 
+Layout integration update:
+- Provider container state is explicit: `idle`, `iframe_blocked`, `native_opening`, `native_visible`, `native_failed`, and `separate_window_fallback`.
+- When the in-layout native child webview reports `native_visible`, React renders a dedicated provider canvas instead of the blocked provider card. This prevents the blank/blocked card from remaining visibly stacked behind the native provider surface.
+- The provider canvas includes the visible boundary label: `Provider-owned native session. Cyro cannot read this content.`
+- The native child webview bounds are aligned to a reserved canvas body rectangle that leaves the Cyro header, boundary label, and bottom composer visible. This is still an interim fixed-safe rectangle matched to the shell layout constants, not a final DOM-measured responsive layout.
+- The child webview bounds are updated on main-window resize and scale-factor changes where Tauri emits those events.
+- Switching away from a provider route closes the active in-layout child webview by provider id so Local route can return to the Cyro home state without a lingering provider overlay.
+
 Remaining risks:
 - The child webview API currently requires Tauri's `unstable` feature in this project.
-- Fixed native child bounds must be refined into a responsive lifecycle model before product use.
+- Fixed native child bounds must be refined into a measured responsive lifecycle model before product use.
 - Provider login redirects may require a tighter provider-specific navigation policy; this task does not validate login.
 - Session persistence remains unvalidated because this spike stays incognito and does not inspect provider storage.
 - Cross-platform behavior is unvalidated.

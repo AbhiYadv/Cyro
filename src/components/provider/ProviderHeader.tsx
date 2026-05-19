@@ -9,13 +9,14 @@ import type {
   ProviderShellReasoningMode,
   ProviderSurfaceStatus
 } from "../../services/providerShell";
-import type { ProviderRouteId } from "../../types/provider";
+import type { ProviderContainerState, ProviderRouteId } from "../../types/provider";
 
 type ProviderHeaderProps = {
   selectedProvider: ProviderRouteId;
   reasoningMode: ProviderShellReasoningMode;
   generationState: ProviderShellGenerationState;
   providerSurfaceStatus: ProviderSurfaceStatus;
+  providerContainerState?: ProviderContainerState;
   diagnosticsOpen: boolean;
   onDrawerToggle: () => void;
   onDiagnosticsToggle: () => void;
@@ -26,6 +27,7 @@ export function ProviderHeader({
   reasoningMode,
   generationState,
   providerSurfaceStatus,
+  providerContainerState = "idle",
   diagnosticsOpen,
   onDrawerToggle,
   onDiagnosticsToggle
@@ -42,7 +44,7 @@ export function ProviderHeader({
         <strong>{providerHeaderRouteLabel(selectedProvider)}</strong>
       </div>
       <div className="provider-header-status" aria-label="Provider shell status">
-        <span>{providerShellStatusLabel(providerSurfaceStatus)}</span>
+        <span>{providerHeaderStatusLabel(providerSurfaceStatus, providerContainerState)}</span>
         <span>{reasoningMode}</span>
         <span>{control.intent === "stop" ? "Generating" : "Idle"}</span>
       </div>
@@ -51,4 +53,27 @@ export function ProviderHeader({
       </button>
     </header>
   );
+}
+
+function providerHeaderStatusLabel(
+  providerSurfaceStatus: ProviderSurfaceStatus,
+  providerContainerState: ProviderContainerState
+) {
+  if (providerContainerState === "native_visible") {
+    return "Native visible";
+  }
+
+  if (providerContainerState === "native_opening") {
+    return "Opening";
+  }
+
+  if (providerContainerState === "native_failed") {
+    return "Native failed";
+  }
+
+  if (providerContainerState === "separate_window_fallback") {
+    return "Fallback";
+  }
+
+  return providerShellStatusLabel(providerSurfaceStatus);
 }

@@ -5,6 +5,8 @@ import { CyroComposer } from "../components/provider/CyroComposer";
 import { CyroLeftDrawer } from "../components/provider/CyroLeftDrawer";
 import { CyroPresence } from "../components/provider/CyroPresence";
 import { ProviderBlockedState } from "../components/provider/ProviderBlockedState";
+import { ProviderContainerSurface } from "../components/provider/ProviderContainerSurface";
+import { ProviderNativeCanvas } from "../components/provider/ProviderNativeCanvas";
 import { ProviderHeader } from "../components/provider/ProviderHeader";
 import { ProviderShellLayout } from "../components/provider/ProviderShellLayout";
 import { ProviderToolsMenu } from "../components/provider/ProviderToolsMenu";
@@ -90,7 +92,7 @@ describe("provider shell components", () => {
       <ProviderBlockedState
         provider="chatgpt"
         status="blocked"
-        nativeContainerStatus="untested"
+        containerState="iframe_blocked"
         onOpenInLayoutContainer={noop}
         onOpenSeparateWindowFallback={noop}
       />
@@ -123,26 +125,70 @@ describe("provider shell components", () => {
 
   it("renders in-layout and separate-window provider container states distinctly", () => {
     const inLayoutHtml = renderToString(
-      <ProviderBlockedState
+      <ProviderContainerSurface
         provider="claude"
         status="unvalidated"
-        nativeContainerStatus="in_layout"
+        containerState="native_visible"
         nativeContainerMessage="Claude in-layout native provider webview opened inside the main Cyro window."
       />
     );
     const fallbackHtml = renderToString(
-      <ProviderBlockedState
+      <ProviderContainerSurface
         provider="claude"
         status="unvalidated"
-        nativeContainerStatus="separate_window_fallback"
+        containerState="separate_window_fallback"
         nativeContainerMessage="Claude separate native provider window opened as fallback only."
       />
     );
 
-    expect(inLayoutHtml).toContain("In-layout prototype");
+    expect(inLayoutHtml).toContain("provider-native-canvas");
+    expect(inLayoutHtml).toContain("Provider-owned native session. Cyro cannot read this content.");
     expect(inLayoutHtml).toContain("inside the main Cyro window");
+    expect(inLayoutHtml).not.toContain("Provider shell is not validated yet.");
+    expect(inLayoutHtml).not.toContain("Iframe display is blocked.");
     expect(fallbackHtml).toContain("Separate window fallback");
     expect(fallbackHtml).toContain("fallback only");
+  });
+
+  it("renders native provider canvas for native_visible state", () => {
+    const html = renderToString(
+      <ProviderNativeCanvas
+        provider="chatgpt"
+        containerState="native_visible"
+        nativeContainerMessage="ChatGPT native provider webview opened inside the main Cyro window."
+      />
+    );
+
+    expect(html).toContain("provider-native-canvas");
+    expect(html).toContain("ChatGPT");
+    expect(html).toContain("Provider-owned native session. Cyro cannot read this content.");
+    expect(html).toContain("native provider webview opened inside the main Cyro window");
+  });
+
+  it("renders iframe blocked card only for iframe_blocked state and not native_visible", () => {
+    const blockedHtml = renderToString(
+      <ProviderContainerSurface
+        provider="chatgpt"
+        status="blocked"
+        containerState="iframe_blocked"
+        onOpenInLayoutContainer={noop}
+        onOpenSeparateWindowFallback={noop}
+      />
+    );
+    const nativeHtml = renderToString(
+      <ProviderContainerSurface
+        provider="chatgpt"
+        status="blocked"
+        containerState="native_visible"
+        nativeContainerMessage="ChatGPT native provider webview opened inside the main Cyro window."
+      />
+    );
+
+    expect(blockedHtml).toContain("Iframe display is blocked.");
+    expect(blockedHtml).toContain("blank or blocked iframe");
+    expect(nativeHtml).toContain("provider-native-canvas");
+    expect(nativeHtml).not.toContain("Iframe display is blocked.");
+    expect(nativeHtml).not.toContain("blank or blocked iframe");
   });
 
   it("labels provider header routes as container pending without changing Local", () => {
@@ -173,6 +219,25 @@ describe("provider shell components", () => {
     expect(geminiHtml).toContain("Container pending");
     expect(localHtml).toContain(">Local<");
     expect(localHtml).not.toContain("Container pending");
+  });
+
+  it("labels the provider header as native visible when the child container is attached", () => {
+    const html = renderToString(
+      <ProviderHeader
+        selectedProvider="chatgpt"
+        reasoningMode="fast"
+        generationState="idle"
+        providerSurfaceStatus="blocked"
+        providerContainerState="native_visible"
+        diagnosticsOpen={false}
+        onDrawerToggle={noop}
+        onDiagnosticsToggle={noop}
+      />
+    );
+
+    expect(html).toContain("ChatGPT route prototype");
+    expect(html).toContain("Native visible");
+    expect(html).not.toContain("Blocked iframe");
   });
 
   it("renders the tools sheet when opened", () => {
