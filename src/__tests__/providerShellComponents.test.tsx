@@ -509,7 +509,8 @@ describe("provider shell components", () => {
 
     expect(html).toContain("provider-native-canvas");
     expect(html).toContain("provider-native-loading");
-    expect(html).toContain("provider-loading-star");
+    expect(html).toContain("provider-loading-mark");
+    expect(html).not.toContain("provider-loading-star");
     expect(html).toContain("Opening provider session…");
     expect(html).toContain("Protected provider session");
     expect(html).not.toContain("Opening native provider session…");
@@ -531,7 +532,8 @@ describe("provider shell components", () => {
 
     expect(html).toContain("provider-native-canvas");
     expect(html).toContain("provider-native-loading");
-    expect(html).toContain("provider-loading-star");
+    expect(html).toContain("provider-loading-mark");
+    expect(html).not.toContain("provider-loading-star");
     expect(html).toContain("Opening provider session…");
     expect(html).not.toContain("Open Gemini in Cyro.");
   });

@@ -77,9 +77,8 @@ export function ProviderNativeCanvas({
       >
         {loading ? (
           <div className="provider-native-loading" role="status">
-            <span className="provider-loading-star" aria-hidden="true">
-              <span className="provider-loading-star-body" />
-              <span className="provider-loading-star-wave" />
+            <span className="provider-loading-mark" aria-hidden="true">
+              <span className="provider-loading-mark-dot" />
             </span>
             <span>Opening provider session…</span>
           </div>
