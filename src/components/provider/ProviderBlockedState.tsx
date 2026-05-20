@@ -1,28 +1,21 @@
-import type { ProviderRouteId } from "../../types/provider";
-import { providerDisplayName, providerRouteStatusText } from "../../services/providerShell";
+import type { ProviderContainerState, ProviderRouteId } from "../../types/provider";
+import { providerDisplayName } from "../../services/providerShell";
 import type { ProviderSurfaceStatus } from "../../services/providerShell";
-import type { ProviderNativeContainerStatus } from "../../types/provider";
 
 type ProviderBlockedStateProps = {
   provider: ProviderRouteId;
   status: ProviderSurfaceStatus;
-  nativeContainerStatus?: ProviderNativeContainerStatus;
+  containerState?: ProviderContainerState;
   nativeContainerMessage?: string | null;
-  onOpenNativeContainer?: () => void;
-};
-
-const fallbackOrigins: Record<Exclude<ProviderRouteId, "local">, string> = {
-  chatgpt: "https://chatgpt.com",
-  claude: "https://claude.ai",
-  gemini: "https://gemini.google.com"
+  onOpenInLayoutContainer?: () => void;
 };
 
 export function ProviderBlockedState({
   provider,
   status,
-  nativeContainerStatus = "untested",
+  containerState = "idle",
   nativeContainerMessage = null,
-  onOpenNativeContainer
+  onOpenInLayoutContainer
 }: ProviderBlockedStateProps) {
   const providerName = providerDisplayName(provider);
 
@@ -41,39 +34,41 @@ export function ProviderBlockedState({
 
   const isBlocked = status === "blocked";
 
+  if (containerState === "native_opening") {
+    return (
+      <article className="provider-blocked-state provider-opening-state" aria-live="polite">
+        <div className="provider-opening-pulse" aria-hidden="true" />
+        <h2>Opening native provider session…</h2>
+        <p className="provider-native-boundary">No DOM, cookie, credential, prompt, or response capture.</p>
+        {nativeContainerMessage ? (
+          <p className="provider-native-status" role="status">
+            {nativeContainerMessage}
+          </p>
+        ) : null}
+      </article>
+    );
+  }
+
   return (
     <article className={isBlocked ? "provider-blocked-state blocked" : "provider-blocked-state"} aria-live="polite">
-      <div className="provider-blocked-marker">{isBlocked ? "Blocked" : "Unvalidated"}</div>
       <div>
-        <p className="eyebrow">{providerRouteStatusText(provider)}</p>
-        <h2>Provider shell is not validated yet.</h2>
+        <p className="eyebrow">{providerName}</p>
+        <h2>Open {providerName} in Cyro.</h2>
       </div>
-      <p className="provider-blocked-cause">{isBlocked ? "Iframe display is blocked." : "Container pending."}</p>
       <p>
+        Provider-owned content opens inside Cyro. Cyro cannot read DOM, cookies, credentials, prompts, or responses.
+      </p>
+      <p className="provider-blocked-cause">
         {isBlocked
-          ? `${providerName} returned a blank or blocked iframe in the feasibility review. Cyro will not pretend this embedded session works.`
-          : `${providerName} is available as a route in the shell prototype, but manual embedded-session validation is still pending.`}
+          ? "Iframe embedding is blocked; use the visible native provider container or separate-window fallback."
+          : "Native provider session validation is pending for this route."}
       </p>
-      <p>
-        Iframe embedding remains a feasibility result, not the final provider-shell solution. CYRO-PROVIDER-010 must
-        validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response
-        capture.
-      </p>
-      <p className="provider-native-boundary">No DOM, cookie, credential, prompt, or response capture.</p>
       <div className="provider-container-actions">
-        {onOpenNativeContainer ? (
-          <button
-            className="provider-native-button"
-            type="button"
-            onClick={onOpenNativeContainer}
-            disabled={nativeContainerStatus === "opening"}
-          >
-            {nativeContainerStatus === "opening" ? "Opening native container" : "Open native container"}
+        {onOpenInLayoutContainer ? (
+          <button className="provider-native-button" type="button" onClick={onOpenInLayoutContainer}>
+            {containerState === "native_failed" ? "Retry in Cyro" : "Open in Cyro"}
           </button>
         ) : null}
-        <a className="provider-fallback-link" href={fallbackOrigins[provider]} target="_blank" rel="noreferrer">
-          Explicit fallback
-        </a>
       </div>
       {nativeContainerMessage ? (
         <p className="provider-native-status" role="status">

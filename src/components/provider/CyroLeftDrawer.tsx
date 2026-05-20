@@ -1,7 +1,11 @@
+import type { CyroTheme } from "../../services/providerShell";
+
 type CyroLeftDrawerProps = {
   open: boolean;
   onToggle: () => void;
   onClose: () => void;
+  theme?: CyroTheme;
+  onThemeToggle?: () => void;
 };
 
 const recentChats = [
@@ -13,7 +17,9 @@ const recentChats = [
 
 const providerRoutes = ["Local", "ChatGPT", "Claude", "Gemini"];
 
-export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps) {
+export function CyroLeftDrawer({ open, onToggle, onClose, theme = "dark", onThemeToggle }: CyroLeftDrawerProps) {
+  const nextThemeLabel = theme === "dark" ? "light" : "dark";
+
   return (
     <>
       {open ? <button className="drawer-scrim" type="button" aria-label="Close left drawer" onClick={onClose} /> : null}
@@ -24,7 +30,15 @@ export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps)
             <strong>Cyro</strong>
           </div>
           <button className="ghost-icon-button" type="button" onClick={onToggle} aria-label={open ? "Close navigation drawer" : "Open navigation drawer"}>
-            {open ? "Close" : "Menu"}
+            {open ? (
+              <span className="drawer-close-icon" aria-hidden="true" />
+            ) : (
+              <span className="hamburger-icon" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            )}
           </button>
         </div>
 
@@ -42,7 +56,16 @@ export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps)
           <button type="button">Memory</button>
           <button type="button">Vault</button>
           <button type="button">Provider sessions</button>
-          <button type="button">Notebooks</button>
+          <button type="button">Settings</button>
+          <button
+            className="drawer-theme-toggle compact"
+            type="button"
+            onClick={onThemeToggle}
+            aria-label={`Switch to ${nextThemeLabel} theme`}
+            title={`Switch to ${nextThemeLabel} theme`}
+          >
+            <span className={theme === "dark" ? "theme-icon moon" : "theme-icon sun"} aria-hidden="true" />
+          </button>
         </nav>
 
         <section className="drawer-provider-routes" aria-label="Provider route placeholders">
@@ -50,7 +73,6 @@ export function CyroLeftDrawer({ open, onToggle, onClose }: CyroLeftDrawerProps)
           {providerRoutes.map((route) => (
             <button type="button" key={route}>
               <span>{route}</span>
-              <small>{route === "Local" ? "Ready" : "Shell only"}</small>
             </button>
           ))}
         </section>

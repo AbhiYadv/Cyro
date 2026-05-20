@@ -18,6 +18,7 @@ Current implementation state:
 - CYRO-PROVIDER-009 is only a route-prototype shell. Provider shell is not validated yet; Gemini is available as a route in the shell prototype, but manual embedded-session validation is still pending.
 - CYRO-PROVIDER-010 adds a safe Tauri `WebviewWindow` spike opened by provider id only. It uses hardcoded provider origins, visible user-controlled provider windows, incognito webviews for this spike, and no DOM, cookie, credential, prompt, response, API, or memory-import access.
 - CYRO-PROVIDER-010 has not yet proven final embedded in-Cyro provider UX. The separate native window is an interim research result. On 2026-05-19, ChatGPT, Claude, and Gemini each loaded a visible logged-out provider-owned surface in a Tauri WebviewWindow on macOS, but login, chat usability, persistent session behavior, and in-layout child webview UX remain unproven.
+- CYRO-PROVIDER-011 adds a Rust-owned Tauri child webview prototype attached to the main Cyro window by provider id only. The code path uses allowlisted origins, visible child webviews, incognito mode, same-host navigation, and popup denial. Manual native validation did not complete in this run, so no provider may be marked as successfully rendering in-layout yet.
 - ChatGPT, Claude, and Gemini routes may still use a safe external-browser fallback only as temporary spike behavior or blocked-provider fallback.
 - Cyro does not send prompts automatically to providers.
 - Cyro shows external-provider handoff status only.
@@ -42,6 +43,10 @@ Embedded provider session feasibility is a required product milestone before Pro
 CYRO-PROVIDER-008 records feasibility status only. It does not claim that provider login or chat works until the user manually validates ChatGPT, Claude, and Gemini inside the native app. ChatGPT's observed blank/blocked iframe means the iframe route is not acceptable as final provider shell UX. Iframe embedding remains a feasibility result, not the final provider-shell solution. If a provider blocks embedding, Cyro must show a blocked state and expose only an explicit user-triggered external fallback. CYRO-PROVIDER-010 must validate a Tauri-native visible webview/session container with no DOM, cookie, credential, prompt, or response capture.
 
 CYRO-PROVIDER-010's current implementation opens a separate visible Tauri-native provider window, not a polished embedded pane inside the Cyro chat stage. This is acceptable only as feasibility research. External browser fallback remains fallback only, and no provider route may be marked product-validated until manual validation records login behavior, chat usability, cross-platform behavior, and provider-specific blockers.
+
+CYRO-PROVIDER-011's current implementation tests the in-layout native child webview path. It is also feasibility research only. It does not validate provider login, provider chat, persistent sessions, or final responsive layout behavior. The separate `WebviewWindow` path remains fallback only and must not be presented as final product UX.
+
+CYRO-PROVIDER-011 layout integration keeps the Cyro header and composer as the shell frame. Once an in-layout native provider child webview is visible, the blocked-provider card is replaced by a Cyro-owned provider canvas reservation with an explicit provider-owned-content boundary label. The current bounds are an interim fixed-safe content rectangle with resize handling, not a final fully measured layout engine.
 
 Cyro remains the control plane for memory, vault, privacy filtering, provider route selection, and context capsule preparation.
 

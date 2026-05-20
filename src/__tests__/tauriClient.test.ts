@@ -2,10 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   formatRuntimeError,
   cancelGeneration,
+  closeInLayoutProviderContainer,
   getProviderSession,
   getRuntimeStatus,
+  hideInLayoutProviderContainer,
   isPromptValid,
   openNativeProviderContainer,
+  openInLayoutProviderContainer,
+  providerGoHome,
+  providerReload,
+  resizeInLayoutProviderContainer,
   runRuntimeBenchmark,
   sendLocalPrompt,
   sendLocalPromptStreaming,
@@ -13,6 +19,13 @@ import {
   type TauriInvoker
 } from "../services/tauriClient";
 import type { LocalPromptStreamEvent } from "../types/runtime";
+
+const viewportBounds = {
+  x: 8,
+  y: 76,
+  width: 1360,
+  height: 820
+};
 
 describe("tauriClient Sprint 0 contract", () => {
   it("rejects empty prompts before invoking Tauri", async () => {
@@ -237,8 +250,8 @@ describe("tauriClient Sprint 0 contract", () => {
         origin: "https://gemini.google.com",
         windowLabel: "provider-gemini",
         surfaceMechanism: "native_webview_window",
-        status: "visible",
-        message: "Gemini native provider window opened. Provider-owned content remains visible and user-controlled."
+        status: "separate_window_fallback",
+        message: "Gemini separate native provider window opened as fallback only. Provider-owned content remains visible and user-controlled."
       } as T;
     };
 
@@ -246,7 +259,149 @@ describe("tauriClient Sprint 0 contract", () => {
       providerId: "gemini",
       windowLabel: "provider-gemini",
       surfaceMechanism: "native_webview_window",
-      status: "visible"
+      status: "separate_window_fallback"
+    });
+  });
+
+  it("requests the in-layout provider container by provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("open_in_layout_provider_container");
+      expect(args).toEqual({ providerId: "claude", viewportBounds });
+      expect(JSON.stringify(args)).not.toContain("https://claude.ai");
+      return {
+        providerId: "claude",
+        displayName: "Claude",
+        origin: "https://claude.ai",
+        windowLabel: "provider-in-layout-claude",
+        surfaceMechanism: "native_child_webview",
+        status: "native_visible",
+        message: "Claude in-layout native provider webview opened inside the main Cyro window."
+      } as T;
+    };
+
+    await expect(openInLayoutProviderContainer("claude", viewportBounds, invoker)).resolves.toMatchObject({
+      providerId: "claude",
+      windowLabel: "provider-in-layout-claude",
+      surfaceMechanism: "native_child_webview",
+      status: "native_visible"
+    });
+  });
+
+  it("does not pretend the in-layout native container opens in browser preview", async () => {
+    await expect(openInLayoutProviderContainer("gemini", viewportBounds)).rejects.toThrow(
+      "In-layout native provider container requires the Tauri app."
+    );
+  });
+
+  it("resizes the in-layout provider container with provider id and numeric bounds only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("resize_in_layout_provider_container");
+      expect(args).toEqual({ providerId: "chatgpt", viewportBounds });
+      expect(JSON.stringify(args)).not.toContain("https://chatgpt.com");
+      expect(Object.values((args?.viewportBounds ?? {}) as Record<string, unknown>).every((value) => typeof value === "number")).toBe(true);
+      return {
+        providerId: "chatgpt",
+        displayName: "ChatGPT",
+        origin: "https://chatgpt.com",
+        windowLabel: "provider-in-layout-chatgpt",
+        surfaceMechanism: "native_child_webview",
+        status: "native_visible",
+        message: "ChatGPT in-layout native provider webview bounds updated."
+      } as T;
+    };
+
+    await expect(resizeInLayoutProviderContainer("chatgpt", viewportBounds, invoker)).resolves.toMatchObject({
+      providerId: "chatgpt",
+      windowLabel: "provider-in-layout-chatgpt",
+      status: "native_visible"
+    });
+  });
+
+  it("requests in-layout provider container close by provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("close_in_layout_provider_container");
+      expect(args).toEqual({ providerId: "chatgpt" });
+      expect(JSON.stringify(args)).not.toContain("https://chatgpt.com");
+      return {
+        providerId: "chatgpt",
+        displayName: "ChatGPT",
+        origin: "https://chatgpt.com",
+        windowLabel: "provider-in-layout-chatgpt",
+        surfaceMechanism: "native_child_webview",
+        status: "idle",
+        message: "ChatGPT in-layout native provider webview closed."
+      } as T;
+    };
+
+    await expect(closeInLayoutProviderContainer("chatgpt", invoker)).resolves.toMatchObject({
+      providerId: "chatgpt",
+      status: "idle"
+    });
+  });
+
+  it("hides in-layout provider container by provider id only without closing the session", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("hide_in_layout_provider_container");
+      expect(args).toEqual({ providerId: "gemini" });
+      expect(JSON.stringify(args)).not.toContain("https://gemini.google.com");
+      return {
+        providerId: "gemini",
+        displayName: "Gemini",
+        origin: "https://gemini.google.com",
+        windowLabel: "provider-in-layout-gemini",
+        surfaceMechanism: "native_child_webview",
+        status: "native_hidden",
+        message: "Gemini in-layout native provider webview hidden without closing its provider-owned session."
+      } as T;
+    };
+
+    await expect(hideInLayoutProviderContainer("gemini", invoker)).resolves.toMatchObject({
+      providerId: "gemini",
+      status: "native_hidden"
+    });
+  });
+
+  it("reloads the in-layout provider container by provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("provider_reload");
+      expect(args).toEqual({ providerId: "chatgpt" });
+      expect(JSON.stringify(args)).not.toContain("https://chatgpt.com");
+      return {
+        providerId: "chatgpt",
+        displayName: "ChatGPT",
+        origin: "https://chatgpt.com",
+        windowLabel: "provider-in-layout-chatgpt",
+        surfaceMechanism: "native_child_webview",
+        status: "native_visible",
+        message: "ChatGPT provider session reload requested."
+      } as T;
+    };
+
+    await expect(providerReload("chatgpt", invoker)).resolves.toMatchObject({
+      providerId: "chatgpt",
+      status: "native_visible"
+    });
+  });
+
+  it("navigates provider home by provider id only", async () => {
+    const invoker: TauriInvoker = async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("provider_go_home");
+      expect(args).toEqual({ providerId: "gemini" });
+      expect(JSON.stringify(args)).not.toContain("https://gemini.google.com");
+      return {
+        providerId: "gemini",
+        displayName: "Gemini",
+        origin: "https://gemini.google.com",
+        windowLabel: "provider-in-layout-gemini",
+        surfaceMechanism: "native_child_webview",
+        status: "native_visible",
+        message: "Gemini provider session home requested."
+      } as T;
+    };
+
+    await expect(providerGoHome("gemini", invoker)).resolves.toMatchObject({
+      providerId: "gemini",
+      status: "native_visible"
     });
   });
 

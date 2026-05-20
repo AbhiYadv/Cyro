@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 1420",
     "tauri": "node scripts/tauri-cli.mjs",
-    "test": "vitest run"
+    "test": "vitest run --exclude '**/.claude/**' --exclude '**/.claude/worktrees/**'"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

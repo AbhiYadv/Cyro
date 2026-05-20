@@ -1,8 +1,11 @@
-import type { ProviderRouteId } from "../types/provider";
+import type { ProviderContainerState, ProviderRouteId, ProviderViewportBounds } from "../types/provider";
 
 export type ProviderShellReasoningMode = "fast" | "think" | "pro";
 export type ProviderShellGenerationState = "idle" | "starting" | "streaming" | "cancelling" | "cancelled" | "completed" | "failed";
 export type ProviderSurfaceStatus = "ready" | "blocked" | "unvalidated" | "fallback";
+export type CyroTheme = "dark" | "light";
+
+export const CYRO_THEME_STORAGE_KEY = "cyro.theme";
 
 export type ProviderShellState = {
   selectedProvider: ProviderRouteId;
@@ -65,36 +68,87 @@ export function shellComposerPlaceholder(provider: ProviderRouteId) {
     return "Ask Local";
   }
 
-  return `Draft for ${providerDisplayName(provider)} route prototype`;
+  return "Prompt bridge coming later";
 }
 
-export function providerRouteQualifier(provider: ProviderRouteId) {
-  if (provider === "local") {
-    return "";
-  }
-
-  if (provider === "chatgpt") {
-    return "Blocked";
-  }
-
-  return "Prototype";
+export function providerRouteQualifier(_provider: ProviderRouteId) {
+  return "";
 }
 
 export function providerHeaderRouteLabel(provider: ProviderRouteId) {
+  return providerDisplayName(provider);
+}
+
+export function shouldAutoOpenProvider(provider: ProviderRouteId, containerState: ProviderContainerState | undefined): boolean {
+  if (provider === "local") return false;
+  if (containerState === "native_opening" || containerState === "native_visible" || containerState === "separate_window_fallback") return false;
+  return true;
+}
+
+export function providerContainerStateForRoute(
+  provider: ProviderRouteId,
+  nativeContainerStatus: Record<Exclude<ProviderRouteId, "local">, ProviderContainerState>
+): ProviderContainerState {
   if (provider === "local") {
-    return providerDisplayName(provider);
+    return "idle";
   }
 
-  return `${providerDisplayName(provider)} route prototype`;
+  return nativeContainerStatus[provider] ?? "idle";
+}
+
+export function normalizeProviderViewportBounds(bounds: ProviderViewportBounds | null | undefined): ProviderViewportBounds | null {
+  if (!bounds) {
+    return null;
+  }
+
+  const values = [bounds.x, bounds.y, bounds.width, bounds.height];
+  const hasInvalidNumber = values.some((value) => !Number.isFinite(value));
+  if (
+    hasInvalidNumber ||
+    bounds.x < 0 ||
+    bounds.y < 0 ||
+    bounds.width < 320 ||
+    bounds.height < 280 ||
+    values.some((value) => value > 12_000)
+  ) {
+    return null;
+  }
+
+  return {
+    x: Math.round(bounds.x),
+    y: Math.round(bounds.y),
+    width: Math.round(bounds.width),
+    height: Math.round(bounds.height)
+  };
+}
+
+export function shouldSyncProviderViewportBounds(
+  provider: ProviderRouteId | null,
+  containerState: ProviderContainerState | undefined,
+  bounds: ProviderViewportBounds | null | undefined
+): boolean {
+  if (!provider || provider === "local" || containerState !== "native_visible") {
+    return false;
+  }
+
+  return normalizeProviderViewportBounds(bounds) !== null;
+}
+
+export function resolveCyroTheme(theme: string | null | undefined): CyroTheme {
+  return theme === "light" || theme === "dark" ? theme : "dark";
+}
+
+export function nextCyroTheme(theme: CyroTheme): CyroTheme {
+  return theme === "dark" ? "light" : "dark";
 }
 
 export function providerShellStatusLabel(status: ProviderSurfaceStatus) {
   if (status === "blocked") {
-    return "Blocked iframe";
+    return "Blocked";
   }
 
   if (status === "unvalidated") {
-    return "Container pending";
+    return "Pending";
   }
 
   if (status === "fallback") {
@@ -106,10 +160,10 @@ export function providerShellStatusLabel(status: ProviderSurfaceStatus) {
 
 export function providerRouteStatusText(provider: ProviderRouteId) {
   if (provider === "local") {
-    return "Local route";
+    return "Local";
   }
 
-  return `${providerDisplayName(provider)} route prototype`;
+  return providerDisplayName(provider);
 }
 
 export function providerSurfaceStatusForRoute(provider: ProviderRouteId): ProviderSurfaceStatus {

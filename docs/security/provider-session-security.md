@@ -40,6 +40,18 @@ The WebviewWindow is incognito for this spike so Cyro does not intentionally per
 
 Provider pop-up windows are denied in this spike to avoid uncontrolled secondary provider windows. This may degrade some login flows and must be recorded in manual validation instead of bypassed.
 
+## CYRO-PROVIDER-011 In-layout Native Webview Security Addendum
+
+CYRO-PROVIDER-011 is an in-layout native child webview feasibility spike, not a provider automation feature. The frontend request shape remains `{ providerId }`; Rust maps the provider id to a hardcoded allowlisted origin and rejects unknown ids or arbitrary URL strings.
+
+The spike attaches provider-owned content to the main Cyro window through a visible Tauri child webview. It does not add provider APIs, scraping, DOM reading, JavaScript injection, auto-login, credential handling, cookie capture, cookie export, cookie manipulation, prompt automation, provider response capture, provider memory import, hidden sessions, or bypass behavior.
+
+The child webview is incognito for this spike and denies provider popup windows. It also limits top-level navigation to the allowlisted provider host. That navigation rule is intentionally conservative and may block login redirects; login and session persistence are not validated by this task.
+
+Manual native validation did not complete in this run because the environment rejected launching `pnpm tauri dev`. No provider route may be marked as validated in-layout until ChatGPT, Claude, and Gemini are each manually tested in the native app.
+
+CYRO-PROVIDER-011 layout integration adds only Cyro-owned state and framing around the native child webview. When provider content is native-visible, React removes the blocked card and renders a provider canvas reservation with the label `Provider-owned native session. Cyro cannot read this content.` The label is Cyro-owned UI; it does not inspect provider DOM, cookies, credentials, prompts, or responses.
+
 ## Future Embedded Session Conditions
 
 Embedded provider sessions may be considered only if all of these are satisfied:

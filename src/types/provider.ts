@@ -1,8 +1,16 @@
 export type ProviderId = "chatgpt" | "claude" | "gemini";
 export type ProviderRouteId = "local" | ProviderId;
-export type ProviderSurfaceMechanism = "iframe" | "native_webview_window";
+export type ProviderSurfaceMechanism = "iframe" | "native_webview_window" | "native_child_webview";
 export type ProviderFeasibilityStatus = "blocked_blank" | "not_tested";
-export type ProviderNativeContainerStatus = "untested" | "opening" | "visible" | "blocked" | "failed" | "fallback";
+export type ProviderContainerState =
+  | "idle"
+  | "iframe_blocked"
+  | "native_opening"
+  | "native_visible"
+  | "native_hidden"
+  | "native_failed"
+  | "separate_window_fallback";
+export type ProviderNativeContainerStatus = ProviderContainerState;
 
 export type ProviderSessionDescriptor = {
   providerId: ProviderId;
@@ -21,7 +29,14 @@ export type ProviderNativeContainerResult = {
   displayName: string;
   origin: string;
   windowLabel: string;
-  surfaceMechanism: "native_webview_window";
+  surfaceMechanism: "native_webview_window" | "native_child_webview";
   status: ProviderNativeContainerStatus;
   message: string;
+};
+
+export type ProviderViewportBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 };
