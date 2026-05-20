@@ -5,6 +5,7 @@ import {
   defaultProviderShellState,
   nextCyroTheme,
   normalizeProviderViewportBounds,
+  providerContainerStateForRoute,
   providerDisplayName,
   providerShellReducer,
   resolveCyroTheme,
@@ -65,15 +66,14 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
     claude: false,
     gemini: false
   });
+  const [manualImportProvider, setManualImportProvider] = useState<ProviderId | null>(null);
   const providerLoadingMaskStartedAtRef = useRef<Record<ProviderId, number>>({
     chatgpt: 0,
     claude: 0,
     gemini: 0
   });
   const activeProvider = isProviderId(shellState.selectedProvider) ? shellState.selectedProvider : null;
-  const activeContainerState = activeProvider
-    ? nativeContainerStatus[activeProvider]
-    : "idle";
+  const activeContainerState = providerContainerStateForRoute(shellState.selectedProvider, nativeContainerStatus);
   const activeProviderLoadingMask = activeProvider ? providerLoadingMask[activeProvider] : false;
 
   useEffect(() => {
@@ -277,28 +277,8 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
 
   async function handleProviderChange(provider: ProviderRouteId) {
     const previousProvider = shellState.selectedProvider;
-    if (
-      provider !== previousProvider &&
-      isProviderId(previousProvider) &&
-      nativeContainerStatus[previousProvider] === "native_visible"
-    ) {
-      try {
-        await hideInLayoutProviderContainer(previousProvider);
-        setNativeContainerStatus((current) => ({
-          ...current,
-          [previousProvider]: "native_hidden"
-        }));
-        setNativeContainerMessage((current) => ({
-          ...current,
-          [previousProvider]: `${providerDisplayName(previousProvider)} provider session is hidden but not closed.`
-        }));
-      } catch (error) {
-        setNativeContainerStatus((current) => ({ ...current, [previousProvider]: "native_failed" }));
-        setNativeContainerMessage((current) => ({
-          ...current,
-          [previousProvider]: formatRuntimeError(error, "In-layout native provider container failed to hide.")
-        }));
-      }
+    if (provider === previousProvider) {
+      return;
     }
 
     if (isProviderId(provider) && shouldAutoOpenProvider(provider, nativeContainerStatus[provider])) {
@@ -307,6 +287,31 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
 
     dispatch({ type: "select_provider", provider });
     setComposerNotice(null);
+    setManualImportProvider(null);
+
+    if (
+      isProviderId(previousProvider) &&
+      nativeContainerStatus[previousProvider] === "native_visible"
+    ) {
+      void hideInLayoutProviderContainer(previousProvider)
+        .then(() => {
+          setNativeContainerStatus((current) => ({
+            ...current,
+            [previousProvider]: "native_hidden"
+          }));
+          setNativeContainerMessage((current) => ({
+            ...current,
+            [previousProvider]: `${providerDisplayName(previousProvider)} provider session is hidden but not closed.`
+          }));
+        })
+        .catch((error) => {
+          setNativeContainerStatus((current) => ({ ...current, [previousProvider]: "native_failed" }));
+          setNativeContainerMessage((current) => ({
+            ...current,
+            [previousProvider]: formatRuntimeError(error, "In-layout native provider container failed to hide.")
+          }));
+        });
+    }
   }
 
   function handleReasoningChange(reasoningMode: ProviderShellReasoningMode) {
@@ -517,6 +522,10 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
               onOpenInLayoutContainer={() => handleOpenInLayoutContainer(activeProvider)}
               onReload={() => handleProviderReload(activeProvider)}
               onGoHome={() => handleProviderHome(activeProvider)}
+              manualImportOpen={manualImportProvider === activeProvider}
+              onManualImport={() => {
+                setManualImportProvider((current) => current === activeProvider ? null : activeProvider);
+              }}
             />
           ) : null}
         </section>
@@ -542,7 +551,6 @@ export function ProviderShellLayout({ runtimeStatus, onRuntimeRefresh }: Provide
               toolsOpen={shellState.toolsOpen}
               prompt={prompt}
               onPromptChange={setPrompt}
-              onProviderChange={handleProviderChange}
               onReasoningChange={handleReasoningChange}
               onToolsToggle={() => dispatch({ type: "toggle_tools" })}
               onToolsClose={() => dispatch({ type: "close_tools" })}

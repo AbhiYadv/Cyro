@@ -189,6 +189,8 @@ describe("provider shell components", () => {
     expect(html).toContain("aria-label=\"Forward\"");
     expect(html).toContain("aria-label=\"Reload\"");
     expect(html).toContain("aria-label=\"Provider Home\"");
+    expect(html).toContain("aria-label=\"Import manually\"");
+    expect(html).toContain("paste or approve content yourself");
     expect(html).not.toContain("aria-label=\"Open in separate window\"");
     expect(html).toContain("provider-native-canvas-lock");
     expect(html).toContain("ChatGPT");
@@ -214,6 +216,7 @@ describe("provider shell components", () => {
     expect(html).toContain("aria-label=\"Forward\"");
     expect(html).toContain("aria-label=\"Reload\"");
     expect(html).toContain("aria-label=\"Provider Home\"");
+    expect(html).toContain("aria-label=\"Import manually\"");
     expect(html).toContain("disabled=\"\"");
     expect(html).not.toContain(">Back<");
     expect(html).not.toContain(">Forward<");
@@ -252,6 +255,7 @@ describe("provider shell components", () => {
     expect(nativeHtml).not.toContain("Iframe display is blocked.");
     expect(nativeHtml).not.toContain("Open ChatGPT in Cyro.");
     expect(nativeHtml).not.toContain("blank or blocked iframe");
+    expect(nativeHtml).toContain("aria-label=\"Import manually\"");
   });
 
   it("labels provider header routes as container pending without changing Local", () => {
@@ -344,7 +348,6 @@ describe("provider shell components", () => {
       toolsOpen: false,
       prompt: "",
       onPromptChange: noop,
-      onProviderChange: noop,
       onReasoningChange: noop,
       onToolsToggle: noop,
       onToolsClose: noop,
@@ -360,16 +363,15 @@ describe("provider shell components", () => {
     expect(streamingHtml).toContain("Stop");
   });
 
-  it("renders provider and reasoning pill selectors instead of raw selects", () => {
+  it("keeps provider routing out of the Local composer", () => {
     const html = renderToString(
       <CyroComposer
-        selectedProvider="chatgpt"
+        selectedProvider="local"
         reasoningMode="think"
         generationState="idle"
         toolsOpen={false}
         prompt=""
         onPromptChange={noop}
-        onProviderChange={noop}
         onReasoningChange={noop}
         onToolsToggle={noop}
         onToolsClose={noop}
@@ -380,14 +382,17 @@ describe("provider shell components", () => {
 
     expect(html).not.toContain("<select");
     expect(html).not.toContain("<option");
-    expect(html).toContain("provider-pill active");
-    expect(html).toContain("Local");
-    expect(html).toContain("ChatGPT");
-    expect(html).toContain("Claude");
-    expect(html).toContain("Gemini");
+    expect(html).not.toContain("provider-pill-selector");
+    expect(html).not.toContain("aria-label=\"Provider route\"");
+    expect(html).not.toContain(">Local<");
+    expect(html).not.toContain(">ChatGPT<");
+    expect(html).not.toContain(">Claude<");
+    expect(html).not.toContain(">Gemini<");
+    expect(html).toContain("reasoning-selector");
+    expect(html).toContain(">Think<");
+    expect(html).toContain("composer-send-button");
     expect(html).not.toContain("Prototype");
     expect(html).not.toContain("Blocked");
-    expect(html).not.toContain("reasoning-pill active");
   });
 
   it("renders provider tab rail with compact routes and no loud status chips", () => {
@@ -440,7 +445,6 @@ describe("provider shell components", () => {
       toolsOpen: false,
       prompt: "",
       onPromptChange: noop,
-      onProviderChange: noop,
       onReasoningChange: noop,
       onToolsToggle: noop,
       onToolsClose: noop,
@@ -462,7 +466,6 @@ describe("provider shell components", () => {
       toolsOpen: false,
       prompt: "",
       onPromptChange: noop,
-      onProviderChange: noop,
       onReasoningChange: noop,
       onToolsToggle: noop,
       onToolsClose: noop,
@@ -477,6 +480,8 @@ describe("provider shell components", () => {
     expect(chatgptHtml).toContain("Prompt bridge coming later");
     expect(chatgptHtml).toContain("use the provider box inside the session");
     expect(chatgptHtml).toContain("disabled");
+    expect(chatgptHtml).not.toContain("provider-pill-selector");
+    expect(chatgptHtml).not.toContain("aria-label=\"Provider route\"");
     expect(chatgptHtml).not.toContain("composer-send-button");
     expect(chatgptHtml).not.toContain(">Send<");
     expect(chatgptHtml).not.toContain("reasoning-selector");
@@ -613,6 +618,7 @@ describe("provider shell components", () => {
     expect(html).toContain("provider-native-canvas");
     expect(html).toContain("Protected provider session");
     expect(html).toContain("provider-native-canvas-label compact");
+    expect(html).toContain("aria-label=\"Import manually\"");
     expect(html).not.toContain("aria-label=\"Open in separate window\"");
     expect(html).not.toContain("Provider-owned session — Cyro cannot read this content.");
     expect(html).not.toContain(">Open in separate window<");
@@ -628,10 +634,30 @@ describe("provider shell components", () => {
     );
 
     expect(html).toContain("Protected provider session");
+    expect(html).toContain("aria-label=\"Import manually\"");
     expect(html).not.toContain("aria-label=\"Open in separate window\"");
     expect(html).not.toContain("Provider-owned session — Cyro cannot read this content.");
     expect(html).not.toContain(">Open in separate window<");
     expect(html).not.toContain("provider-canvas-external-action");
+  });
+
+  it("shows a manual import placeholder without claiming automatic provider reading", () => {
+    const html = renderToString(
+      <ProviderNativeCanvas
+        provider="gemini"
+        containerState="native_visible"
+        manualImportOpen
+        onManualImport={noop}
+      />
+    );
+
+    expect(html).toContain("aria-label=\"Import manually\"");
+    expect(html).toContain("Manual import only");
+    expect(html).toContain("paste or approve content yourself");
+    expect(html).toContain("Cyro cannot read provider content");
+    expect(html).not.toContain("auto-import");
+    expect(html).not.toContain("automatically capture");
+    expect(html).not.toContain("read provider DOM");
   });
 
   it("does not render reasoning mode or Idle in provider header", () => {

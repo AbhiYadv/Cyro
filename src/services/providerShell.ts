@@ -85,6 +85,17 @@ export function shouldAutoOpenProvider(provider: ProviderRouteId, containerState
   return true;
 }
 
+export function providerContainerStateForRoute(
+  provider: ProviderRouteId,
+  nativeContainerStatus: Record<Exclude<ProviderRouteId, "local">, ProviderContainerState>
+): ProviderContainerState {
+  if (provider === "local") {
+    return "idle";
+  }
+
+  return nativeContainerStatus[provider] ?? "idle";
+}
+
 export function normalizeProviderViewportBounds(bounds: ProviderViewportBounds | null | undefined): ProviderViewportBounds | null {
   if (!bounds) {
     return null;

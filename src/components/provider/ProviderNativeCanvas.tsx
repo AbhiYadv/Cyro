@@ -9,6 +9,8 @@ type ProviderNativeCanvasProps = {
   viewportRef?: Ref<HTMLDivElement>;
   onGoHome?: () => void;
   onReload?: () => void;
+  manualImportOpen?: boolean;
+  onManualImport?: () => void;
 };
 
 export function ProviderNativeCanvas({
@@ -16,7 +18,9 @@ export function ProviderNativeCanvas({
   loading = false,
   viewportRef,
   onGoHome,
-  onReload
+  onReload,
+  manualImportOpen = false,
+  onManualImport
 }: ProviderNativeCanvasProps) {
   const providerName = providerDisplayName(provider);
 
@@ -62,6 +66,17 @@ export function ProviderNativeCanvas({
           >
             <span className="provider-browser-icon provider-browser-icon-home" aria-hidden="true" />
           </button>
+          <button
+            className="provider-browser-control provider-browser-control-import"
+            type="button"
+            aria-label="Import manually"
+            aria-expanded={manualImportOpen}
+            title="Import manually: paste or approve content yourself. Cyro cannot read provider content."
+            onClick={onManualImport}
+            disabled={!onManualImport}
+          >
+            <span className="provider-browser-icon provider-browser-icon-import" aria-hidden="true" />
+          </button>
         </div>
         <div className="provider-native-canvas-label compact provider-native-canvas-lock">
           <span className="provider-native-lock-icon" aria-hidden="true" />
@@ -69,6 +84,12 @@ export function ProviderNativeCanvas({
         </div>
         <span aria-hidden="true" />
       </div>
+      {manualImportOpen ? (
+        <div className="provider-manual-import-panel" role="status">
+          <strong>Manual import only</strong>
+          <span>Paste or approve content yourself. Cyro cannot read provider content.</span>
+        </div>
+      ) : null}
       <div
         className="provider-native-canvas-body provider-native-viewport-host"
         data-provider-viewport-host="true"

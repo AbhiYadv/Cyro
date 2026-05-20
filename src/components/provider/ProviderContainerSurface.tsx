@@ -13,6 +13,8 @@ type ProviderContainerSurfaceProps = {
   onOpenInLayoutContainer?: () => void;
   onGoHome?: () => void;
   onReload?: () => void;
+  manualImportOpen?: boolean;
+  onManualImport?: () => void;
   loadingMaskActive?: boolean;
 };
 
@@ -25,6 +27,8 @@ export function ProviderContainerSurface({
   onOpenInLayoutContainer,
   onGoHome,
   onReload,
+  manualImportOpen,
+  onManualImport,
   loadingMaskActive = false
 }: ProviderContainerSurfaceProps) {
   if (loadingMaskActive || containerState === "native_visible" || containerState === "native_opening") {
@@ -36,6 +40,8 @@ export function ProviderContainerSurface({
         viewportRef={viewportRef}
         onGoHome={onGoHome}
         onReload={onReload}
+        manualImportOpen={manualImportOpen}
+        onManualImport={onManualImport}
       />
     );
   }

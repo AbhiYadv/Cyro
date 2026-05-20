@@ -4,6 +4,7 @@ import {
   generationControlForState,
   nextCyroTheme,
   normalizeProviderViewportBounds,
+  providerContainerStateForRoute,
   providerShellReducer,
   providerSurfaceStatusForRoute,
   resolveCyroTheme,
@@ -173,6 +174,19 @@ describe("provider shell state contract", () => {
     expect(shouldSyncProviderViewportBounds("chatgpt", "native_visible", fullscreenBounds)).toBe(true);
     expect(shouldSyncProviderViewportBounds("gemini", "native_visible", fullscreenBounds)).toBe(true);
     expect(shouldSyncProviderViewportBounds("local", "native_visible", fullscreenBounds)).toBe(false);
+  });
+
+  it("keeps provider container state keyed by provider id", () => {
+    const nativeStatus = {
+      chatgpt: "native_visible" as const,
+      claude: "native_hidden" as const,
+      gemini: "native_opening" as const
+    };
+
+    expect(providerContainerStateForRoute("local", nativeStatus)).toBe("idle");
+    expect(providerContainerStateForRoute("chatgpt", nativeStatus)).toBe("native_visible");
+    expect(providerContainerStateForRoute("claude", nativeStatus)).toBe("native_hidden");
+    expect(providerContainerStateForRoute("gemini", nativeStatus)).toBe("native_opening");
   });
 
   it("does not approve stale or invalid provider bounds for resize sync", () => {
